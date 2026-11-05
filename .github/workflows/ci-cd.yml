@@ -105,10 +105,15 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      # Troca a variável IMAGE_TAG da stack pela tag desse commit e manda o
-      # Portainer puxar o repositório e as imagens de novo. As outras variáveis
-      # da stack (senhas, chaves) vêm do próprio Portainer e voltam pra ele do
-      # jeito que estavam -- nada disso passa pelo log.
+      - uses: actions/checkout@v4
+
+      # A stack não está mais ligada a um repositório Git no Portainer (a
+      # versão do servidor não deixa trocar a URL de uma stack Git, então ela
+      # foi desconectada na troca pro talhao-em-dia). Quem leva o compose pra
+      # lá é este job: manda o docker-compose.yml deste commit e troca só a
+      # IMAGE_TAG. As outras variáveis (senhas, chaves) vêm do próprio
+      # Portainer e voltam pra ele do jeito que estavam -- nada disso passa
+      # pelo log.
       #
       # Hoje o Cloudflare na frente do portainer.lapps.studio responde 403 pros
       # runners do GitHub (de um computador comum a mesma chamada dá 200). Nesse
@@ -123,12 +128,14 @@ jobs:
           tag="sha-${GITHUB_SHA::7}"
 
           deploy_manual() {
-            echo "::warning::$1 -- deploy manual: IMAGE_TAG=$tag no Portainer e Pull and redeploy"
+            echo "::warning::$1 -- deploy manual: IMAGE_TAG=$tag no Portainer e Update the stack"
             {
               echo "### Imagens publicadas com a tag \`$tag\`"
               echo
-              echo "$1. Pra colocar em produção: Portainer → stack hanks-catalogue →"
-              echo "Environment variables → \`IMAGE_TAG\` = \`$tag\` → **Pull and redeploy**."
+              echo "$1. Pra colocar em produção: Portainer → stack hanks-catalogue → Editor →"
+              echo "Environment variables → \`IMAGE_TAG\` = \`$tag\` → **Update the stack**, com"
+              echo "\"Re-pull image and redeploy\" ligado. Se o \`docker-compose.yml\` mudou nesse"
+              echo "commit, colar ele no editor antes."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           }
@@ -146,12 +153,12 @@ jobs:
             deploy_manual "Portainer respondeu $codigo ao ler a stack"
           fi
 
-          jq --arg tag "$tag" '{
-              env: ([.Env[] | select(.name != "IMAGE_TAG")] + [{name: "IMAGE_TAG", value: $tag}]),
-              prune: false,
-              pullImage: true,
-              repositoryReferenceName: .GitConfig.ReferenceName,
-              repositoryAuthentication: false
+          # O Env do pedido substitui o da stack inteiro, por isso vai a lista
+          # que já estava lá, só com a IMAGE_TAG nova.
+          jq --arg tag "$tag" --rawfile compose docker-compose.yml '{
+              StackFileContent: $compose,
+              Env: ([.Env[] | select(.name != "IMAGE_TAG")] + [{name: "IMAGE_TAG", value: $tag}]),
+              RepullImageAndRedeploy: true
             }' stack.json > corpo.json
           endpoint=$(jq -r '.EndpointId' stack.json)
           rm stack.json
@@ -161,7 +168,7 @@ jobs:
           curl -fsS -o /dev/null -X PUT \
             -H "X-API-Key: $PORTAINER_TOKEN" -H "Content-Type: application/json" \
             --data @corpo.json \
-            "$api/stacks/$PORTAINER_STACK_ID/git/redeploy?endpointId=$endpoint"
+            "$api/stacks/$PORTAINER_STACK_ID?endpointId=$endpoint"
           rm corpo.json
 
           echo "### Stack atualizada pra \`$tag\`" >> "$GITHUB_STEP_SUMMARY"

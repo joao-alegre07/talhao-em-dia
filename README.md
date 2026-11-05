@@ -222,12 +222,16 @@ No GitHub Actions esse MariaDB é um service do job de testes.
 
 A cada push na `main` o GitHub Actions roda os testes, publica as imagens
 `ghcr.io/joao-alegre07/talhao-em-dia-{app,auth,log,garage}` com a tag `sha-<commit>` e tenta
-atualizar a stack pela API do Portainer. O Cloudflare na frente do Portainer ainda barra os runners
-do GitHub, então o último passo é um clique: `IMAGE_TAG` = `sha-<commit>` na stack e **Pull and
-redeploy**.
+atualizar a stack pela API do Portainer, mandando o `docker-compose.yml` do commit e a `IMAGE_TAG`
+nova. O Cloudflare na frente do Portainer ainda barra os runners do GitHub, então o último passo é
+um clique: `IMAGE_TAG` = `sha-<commit>` na stack e **Update the stack** com "Re-pull image and
+redeploy" ligado.
 
-A stack é a mesma desde a P1 (`hanks-catalogue`), agora puxando o `docker-compose.yml` deste
-repositório, com as mesmas variáveis de ambiente e o mesmo subdomínio.
+A stack é a mesma desde a P1 (`hanks-catalogue`), com as mesmas variáveis de ambiente e o mesmo
+subdomínio. Ela nasceu ligada ao repositório Git do Hanks-catalogue, e o Portainer do servidor
+(2.39 CE) não deixa trocar a URL do repositório de uma stack Git, nem pela tela nem pela API. Pra
+não criar uma stack nova, ela foi desconectada do Git na troca: o compose dela é o deste repositório
+e as imagens são as que este CI publica, então o repositório antigo não alimenta mais nada.
 
 ## Plano de negócio
 

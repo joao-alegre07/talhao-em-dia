@@ -1,10 +1,11 @@
-# Usado pelo Portainer (Stacks -> Add stack -> Repository -> Deploy the stack).
+# Compose da stack de produção no Portainer. A stack não está ligada a um
+# repositório Git (ver "Deploy" no README): este arquivo vai pro editor dela,
+# colado na mão ou mandado pelo workflow junto com a IMAGE_TAG.
 # As variáveis abaixo vêm do campo "Environment variables" do Portainer no momento
 # do deploy -- nenhum valor real fica gravado neste arquivo nem no repositório.
 #
 # As imagens não são buildadas no servidor: o GitHub Actions builda, testa e
-# publica no GHCR, e o IMAGE_TAG (sha-<commit>) é trocado pelo próprio workflow
-# a cada deploy. Sem IMAGE_TAG definido, cai no latest.
+# publica no GHCR com a tag sha-<commit>. Sem IMAGE_TAG definido, cai no latest.
 #
 # Todos os serviços ficam na rede padrão do projeto (criada automaticamente pelo
 # Compose, sem precisar declarar nada) -- de propósito, pra reaproveitar a rede
