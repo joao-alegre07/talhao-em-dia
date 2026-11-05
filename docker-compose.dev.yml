@@ -91,7 +91,9 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Na primeira subida o MariaDB roda os .sql da pasta em ordem: as
+      # migrações (000, 001) e depois o seed com os dados de exemplo.
+      - ./db:/docker-entrypoint-initdb.d:ro
       - db_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
@@ -101,7 +103,7 @@ services:
       start_period: 20s
 
   # Prometheus coleta o /metrics dos três serviços a cada 15s e o Grafana
-  # mostra o painel "Tom Hanks Catalog" (já provisionado, sem configurar nada
+  # mostra o painel "Talhão em Dia" (já provisionado, sem configurar nada
   # na mão): http://localhost:3000
   prometheus:
     image: prom/prometheus:v3.5.0
@@ -122,7 +124,7 @@ services:
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/hanks-catalogue.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/talhao-em-dia.json
     volumes:
       - ./observabilidade/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observabilidade/grafana/dashboards:/var/lib/grafana/dashboards:ro

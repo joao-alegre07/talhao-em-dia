@@ -50,8 +50,14 @@ def url_temporaria(chave):
         ExpiresIn=URL_VALIDADE_SEGUNDOS,
     )
     # O Garage não tem porta publicada, então o navegador pede a URL assinada
-    # pro catálogo (rota /fotos), que só repassa pro Garage do jeito que veio.
-    return "/fotos" + url[len(_endpoint()):]
+    # pro app (rota /arquivos), que só repassa pro Garage do jeito que veio.
+    return "/arquivos" + url[len(_endpoint()):]
+
+
+def listar(prefixo=""):
+    paginas = _cliente().get_paginator("list_objects_v2").paginate(Bucket=_bucket(), Prefix=prefixo)
+    for pagina in paginas:
+        yield from pagina.get("Contents", [])
 
 
 def url_interna(caminho, query_string):

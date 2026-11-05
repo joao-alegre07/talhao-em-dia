@@ -1,0 +1,8 @@
+<label>Nome comercial<input type="text" name="nome" required maxlength="100" value="{{ dados.nome or '' }}"></label>
+<label>Carência (dias, como está na bula)<input type="number" name="carencia_dias" required min="0" max="365" value="{{ dados.carencia_dias if dados.carencia_dias is not none else '' }}"></label>
+<label>Dose medida em
+  <select name="unidade">
+    <option value="L" {{ "selected" if dados.unidade == "L" }}>litros por hectare (L/ha)</option>
+    <option value="kg" {{ "selected" if dados.unidade == "kg" }}>quilos por hectare (kg/ha)</option>
+  </select>
+</label>

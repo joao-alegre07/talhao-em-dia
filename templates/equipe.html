@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}Equipe · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<h1>Equipe · {{ propriedade.nome }}</h1>
+<p class="sub">Quem entra na propriedade vê os talhões e o caderno dela, e nada de outras propriedades. O funcionário registra aplicações; o agrônomo só acompanha.</p>
+
+<div class="tabela-wrap">
+  <table class="tabela">
+    <thead><tr><th>Nome</th><th>Papel</th><th>Desde</th></tr></thead>
+    <tbody>
+      {% for m in membros %}
+      <tr>
+        <td>{{ m.nome }}{% if m.dono %} <small>(dono)</small>{% endif %}</td>
+        <td>{{ nomes_dos_papeis.get(m.papel, "—") }}</td>
+        <td>{{ m.entrou_em | data }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Convidar</h2>
+<p>O convite é um link que vale 7 dias e serve pra uma pessoa só. Mande pelo WhatsApp: quem abrir cria a conta já dentro da propriedade.</p>
+<form class="acoes" method="post" action="{{ url_for('propriedade.convidar') }}">
+  <button class="botao" type="submit" name="papel" value="funcionario">Convidar funcionário</button>
+  <button class="botao botao-claro" type="submit" name="papel" value="agronomo">Convidar agrônomo</button>
+</form>
+
+{% if convites %}
+<h2>Convites em aberto</h2>
+<ul class="convites">
+  {% for c in convites %}
+  <li class="{{ 'convite-novo' if c.token == novo }}">
+    <strong>{{ nomes_dos_papeis[c.papel] }}</strong> · vale até {{ c.expira_em | data }}
+    <div class="link-convite">
+      <input type="text" readonly value="{{ c.link }}" onclick="this.select()">
+      <button type="button" onclick="navigator.clipboard.writeText('{{ c.link }}'); this.textContent = 'Copiado'">Copiar</button>
+      <a href="https://wa.me/?text={{ ('Entra no caderno de campo da ' ~ propriedade.nome ~ ' pelo Talhão em Dia: ' ~ c.link) | urlencode }}" target="_blank" rel="noopener">WhatsApp</a>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

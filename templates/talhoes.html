@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Talhões · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <h1>Talhões</h1>
+  <div class="acoes">
+    {% if pode_registrar and talhoes %}<a class="botao" href="{{ url_for('telas.nova_aplicacao') }}">+ Registrar aplicação</a>{% endif %}
+    {% if pode_editar %}<a class="botao botao-claro" href="{{ url_for('telas.novo_talhao') }}">+ Novo talhão</a>{% endif %}
+  </div>
+</div>
+
+{% if not propriedades %}
+<div class="vazio">
+  <p>Você ainda não faz parte de nenhuma propriedade.</p>
+  <p>Peça pro produtor o link de convite e abra ele aqui no celular.</p>
+</div>
+{% endif %}
+
+{% for propriedade in propriedades %}
+<section class="propriedade">
+  <h2>{{ propriedade.nome }} <small>{{ propriedade.municipio }}</small></h2>
+  {% set da_propriedade = talhoes | selectattr("propriedade_id", "equalto", propriedade.id) | list %}
+  {% if not da_propriedade %}
+    <p class="vazio">Nenhum talhão cadastrado ainda.{% if pode_editar %} <a href="{{ url_for('telas.novo_talhao') }}">Cadastre o primeiro.</a>{% endif %}</p>
+  {% endif %}
+  <div class="lista-cards">
+    {% for t in da_propriedade %}
+    <a class="card card-talhao{{ ' em-carencia' if t.em_carencia }}{{ ' sem-aplicacao' if t.liberado_em is none }}" href="{{ url_for('telas.talhao', talhao_id=t.id) }}">
+      <h3>{{ t.nome }}</h3>
+      <p class="sub">{{ t.area_ha | num }} ha · {{ t.cultura }} · {{ t.total_aplicacoes }} aplicaç{{ "ões" if t.total_aplicacoes != 1 else "ão" }}</p>
+      {% include "_carencia.html" %}
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

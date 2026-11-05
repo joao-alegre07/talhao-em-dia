@@ -1,15 +1,18 @@
 {% extends "base.html" %}
-{% block body %}
-<main class="auth-page">
-  <form class="auth-form" method="post">
-    <h1>Entrar</h1>
-    {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
-    {% if request.args.get('redefinida') %}<p class="sucesso">Senha alterada! Já pode entrar.</p>{% endif %}
-    <label>E-mail<input type="email" name="email" required autofocus></label>
-    <label>Senha<input type="password" name="senha" required></label>
-    <button type="submit">Entrar</button>
-    <p><a href="{{ url_for('auth.esqueci_senha') }}">Esqueci minha senha</a></p>
-    <p>Não tem conta? <a href="{{ url_for('auth.cadastro') }}">Cadastre-se</a></p>
-  </form>
-</main>
+{% block titulo %}Entrar · Talhão em Dia{% endblock %}
+{% block classe %}pagina-estreita{% endblock %}
+{% block conteudo %}
+<a class="marca marca-solta" href="{{ url_for('inicio.landing') }}">🌱 Talhão em Dia</a>
+<form class="form caixa" method="post">
+  <h1>Entrar</h1>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  {% if request.args.get('redefinida') %}<p class="sucesso">Senha alterada! Já pode entrar.</p>{% endif %}
+  {% if request.args.get('criada') %}<p class="sucesso">Conta criada! Agora é só entrar.</p>{% endif %}
+  <input type="hidden" name="proximo" value="{{ proximo }}">
+  <label>E-mail<input type="email" name="email" required autofocus></label>
+  <label>Senha<input type="password" name="senha" required></label>
+  <button type="submit">Entrar</button>
+  <p><a href="{{ url_for('auth.esqueci_senha') }}">Esqueci minha senha</a></p>
+  <p>Não tem conta? <a href="{{ url_for('auth.cadastro') }}">Cadastre-se</a></p>
+</form>
 {% endblock %}

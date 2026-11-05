@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block titulo %}Produtos · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<h1>Produtos</h1>
+<p class="sub">Os defensivos usados na propriedade, com a carência que está na bula. É dela que sai a data em que cada talhão fica liberado.</p>
+
+{% if produtos %}
+<div class="tabela-wrap">
+  <table class="tabela">
+    <thead>
+      <tr><th>Produto</th><th>Carência</th><th>Dose em</th><th>Usado em</th>{% if pode_editar %}<th></th>{% endif %}</tr>
+    </thead>
+    <tbody>
+      {% for p in produtos %}
+      <tr>
+        <td>{{ p.nome }}</td>
+        <td>{{ p.carencia_dias }} dia{{ "s" if p.carencia_dias != 1 }}</td>
+        <td>{{ p.unidade }}/ha</td>
+        <td>{{ p.total_aplicacoes }} aplicaç{{ "ões" if p.total_aplicacoes != 1 else "ão" }}</td>
+        {% if pode_editar %}
+        <td class="acoes-linha">
+          <a href="{{ url_for('telas.editar_produto', produto_id=p.id) }}">Editar</a>
+          {% if not p.total_aplicacoes %}
+          <form method="post" action="{{ url_for('telas.apagar_produto', produto_id=p.id) }}" onsubmit="return confirm('Apagar {{ p.nome }}?')">
+            <button class="link-perigo" type="submit">Apagar</button>
+          </form>
+          {% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="vazio">Nenhum produto cadastrado ainda.</p>
+{% endif %}
+
+{% if pode_editar %}
+<form class="form caixa" method="post" action="{{ url_for('telas.produtos') }}">
+  <h2>Cadastrar produto</h2>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  {% include "_produto_campos.html" %}
+  <button type="submit">Cadastrar</button>
+</form>
+{% endif %}
+{% endblock %}

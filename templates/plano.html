@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Plano · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<h1>Plano</h1>
+{% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+
+{% if pro %}
+<section class="caixa plano-ativo">
+  <span class="selo selo-liberado">Pro</span>
+  <h2>Sua assinatura está ativa</h2>
+  <p>A cobrança é mensal, pelo Stripe.</p>
+</section>
+{% else %}
+  {% if sucesso %}
+  <p class="aviso">Pagamento enviado. A confirmação chega do Stripe em alguns segundos: atualize a página pra ver o plano ativo.</p>
+  {% elif cancelado %}
+  <p class="aviso">Pagamento cancelado. Nada foi cobrado.</p>
+  {% endif %}
+  <p class="sub">Você está no Free.</p>
+{% endif %}
+
+{% include "_planos.html" %}
+
+{% if not pro and pode_assinar %}
+<form class="centro" method="post" action="{{ url_for('plano.assinar') }}">
+  <button class="botao" type="submit">Assinar o Pro com Stripe</button>
+  <p class="dica">O pagamento é feito na página do Stripe. Os dados do cartão não passam pelo Talhão em Dia.</p>
+</form>
+{% endif %}
+{% endblock %}

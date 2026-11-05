@@ -1,20 +1,21 @@
 {% extends "base.html" %}
-{% block body %}
-<main class="auth-page">
-  {% if mensagem %}
-  <div class="auth-form">
-    <h1>Esqueci minha senha</h1>
-    <p class="sucesso">{{ mensagem }}</p>
-    <p><a href="{{ url_for('auth.login') }}">Voltar pro login</a></p>
-  </div>
-  {% else %}
-  <form class="auth-form" method="post">
-    <h1>Esqueci minha senha</h1>
-    <p>Informe seu e-mail. Se ele estiver cadastrado, você recebe um link pra trocar a senha (válido por 30 minutos).</p>
-    <label>E-mail<input type="email" name="email" required autofocus></label>
-    <button type="submit">Enviar link</button>
-    <p><a href="{{ url_for('auth.login') }}">Voltar pro login</a></p>
-  </form>
-  {% endif %}
-</main>
+{% block titulo %}Esqueci minha senha · Talhão em Dia{% endblock %}
+{% block classe %}pagina-estreita{% endblock %}
+{% block conteudo %}
+<a class="marca marca-solta" href="{{ url_for('inicio.landing') }}">🌱 Talhão em Dia</a>
+{% if mensagem %}
+<div class="form caixa">
+  <h1>Esqueci minha senha</h1>
+  <p class="sucesso">{{ mensagem }}</p>
+  <p><a href="{{ url_for('auth.login') }}">Voltar pro login</a></p>
+</div>
+{% else %}
+<form class="form caixa" method="post">
+  <h1>Esqueci minha senha</h1>
+  <p>Informe seu e-mail. Se ele estiver cadastrado, você recebe um link pra trocar a senha (válido por 30 minutos).</p>
+  <label>E-mail<input type="email" name="email" required autofocus></label>
+  <button type="submit">Enviar link</button>
+  <p><a href="{{ url_for('auth.login') }}">Voltar pro login</a></p>
+</form>
+{% endif %}
 {% endblock %}

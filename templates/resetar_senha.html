@@ -1,13 +1,14 @@
 {% extends "base.html" %}
-{% block body %}
-<main class="auth-page">
-  <form class="auth-form" method="post">
-    <h1>Nova senha</h1>
-    {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
-    <input type="hidden" name="token" value="{{ token }}">
-    <label>Nova senha<input type="password" name="nova_senha" required minlength="6" autofocus></label>
-    <button type="submit">Trocar senha</button>
-    <p><a href="{{ url_for('auth.login') }}">Voltar pro login</a></p>
-  </form>
-</main>
+{% block titulo %}Nova senha · Talhão em Dia{% endblock %}
+{% block classe %}pagina-estreita{% endblock %}
+{% block conteudo %}
+<a class="marca marca-solta" href="{{ url_for('inicio.landing') }}">🌱 Talhão em Dia</a>
+<form class="form caixa" method="post">
+  <h1>Nova senha</h1>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  <input type="hidden" name="token" value="{{ token }}">
+  <label>Nova senha<input type="password" name="nova_senha" required minlength="6" autofocus></label>
+  <button type="submit">Trocar senha</button>
+  <p><a href="{{ url_for('auth.login') }}">Voltar pro login</a></p>
+</form>
 {% endblock %}

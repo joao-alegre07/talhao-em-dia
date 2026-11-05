@@ -7,11 +7,26 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGEM_BASE: ghcr.io/joao-alegre07/hanks-catalogue
+  IMAGEM_BASE: ghcr.io/joao-alegre07/talhao-em-dia
 
 jobs:
   testes:
     runs-on: ubuntu-latest
+    # Os testes do app sobem o auth-service junto e falam com um MariaDB de
+    # verdade, criado pelas migrações de db/.
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: talhao_teste
+          MARIADB_USER: teste
+          MARIADB_PASSWORD: teste
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +40,7 @@ jobs:
           pip install -r requirements.txt -r auth-service/requirements.txt \
             -r log-service/requirements.txt -r requirements-dev.txt
 
-      - name: testes do catálogo
+      - name: testes do app
         run: python -m pytest -v tests
 
       - name: testes do auth-service

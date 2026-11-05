@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}{{ "Editar aplicação" if aplicacao else "Registrar aplicação" }} · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<form class="form caixa" method="post" enctype="multipart/form-data">
+  <h1>{{ "Editar aplicação" if aplicacao else "Registrar aplicação" }}</h1>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+
+  {% if not produtos %}
+  <p class="aviso aviso-erro">Nenhum produto cadastrado na propriedade ainda. O produtor cadastra em <a href="{{ url_for('telas.produtos') }}">Produtos</a>.</p>
+  {% endif %}
+
+  <label>Talhão
+    <select name="talhao_id" required>
+      <option value="">Escolha…</option>
+      {% for t in talhoes %}
+      <option value="{{ t.id }}" {{ "selected" if t.id | string == dados.talhao_id | string }}>{{ t.nome }} ({{ t.area_ha | num }} ha)</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Produto
+    <select name="produto_id" required>
+      <option value="">Escolha…</option>
+      {% for p in produtos %}
+      <option value="{{ p.id }}" {{ "selected" if p.id | string == dados.produto_id | string }}>{{ p.nome }} · {{ p.unidade }}/ha · carência {{ p.carencia_dias }} dias</option>
+      {% endfor %}
+    </select>
+  </label>
+  <div class="linha">
+    <label>Data<input type="date" name="data_aplicacao" required max="{{ hoje.isoformat() }}" value="{{ dados.data_aplicacao or '' }}"></label>
+    <label>Dose por hectare<input type="text" inputmode="decimal" name="dose" required value="{{ dados.dose | num }}" placeholder="2,5"></label>
+  </div>
+  <label>Quem aplicou<input type="text" name="aplicador" required maxlength="100" value="{{ dados.aplicador or '' }}"></label>
+  <label>Observação<textarea name="observacao" maxlength="500" rows="3" placeholder="Ex.: chuva fraca à tarde, bico novo no pulverizador">{{ dados.observacao or '' }}</textarea></label>
+  <label>Foto ou PDF da receita (até {{ receita_max_mb }} MB)
+    <input type="file" name="receita" accept="image/jpeg,image/png,image/webp,application/pdf">
+  </label>
+  {% if aplicacao and aplicacao.receita_key %}<p class="dica">Já tem uma receita anexada. Enviar outra substitui a atual.</p>{% endif %}
+  <button type="submit">{{ "Salvar" if aplicacao else "Registrar" }}</button>
+  <a href="{{ url_for('telas.aplicacao', aplicacao_id=aplicacao.id) if aplicacao else url_for('telas.aplicacoes') }}">Cancelar</a>
+</form>
+{% endblock %}

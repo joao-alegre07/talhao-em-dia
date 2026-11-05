@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}Aplicação de {{ aplicacao.data_aplicacao | data }} · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<p class="trilha">
+  <a href="{{ url_for('telas.aplicacoes') }}">Caderno</a> ›
+  <a href="{{ url_for('telas.talhao', talhao_id=aplicacao.talhao_id) }}">{{ aplicacao.talhao }}</a>
+</p>
+<div class="cabecalho">
+  <div>
+    <h1>{{ aplicacao.produto }}</h1>
+    <p class="sub">{{ aplicacao.data_aplicacao | data }} · {{ aplicacao.talhao }} · {{ aplicacao.propriedade }}</p>
+  </div>
+  {% if pode_alterar %}
+  <div class="acoes">
+    <a class="botao botao-claro" href="{{ url_for('telas.editar_aplicacao', aplicacao_id=aplicacao.id) }}">Editar</a>
+    <form method="post" action="{{ url_for('telas.apagar_aplicacao', aplicacao_id=aplicacao.id) }}" onsubmit="return confirm('Apagar essa aplicação do caderno?')">
+      <button class="botao botao-perigo" type="submit">Apagar</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<dl class="ficha">
+  <dt>Dose</dt><dd>{{ aplicacao.dose | num }} {{ aplicacao.unidade }}/ha</dd>
+  <dt>Carência do produto</dt><dd>{{ aplicacao.carencia_dias }} dias</dd>
+  <dt>Libera o talhão em</dt>
+  <dd><span class="selo {{ 'selo-carencia' if em_carencia else 'selo-liberado' }}">{{ aplicacao.libera_em | data }}</span></dd>
+  <dt>Aplicado por</dt><dd>{{ aplicacao.aplicador }}</dd>
+  <dt>Registrado por</dt><dd>{{ registrado_por or "usuário " ~ aplicacao.registrado_por }} em {{ aplicacao.criado_em.strftime("%d/%m/%Y") }}</dd>
+  {% if aplicacao.observacao %}<dt>Observação</dt><dd class="texto-livre">{{ aplicacao.observacao }}</dd>{% endif %}
+</dl>
+
+<h2>Receita</h2>
+{% if receita_url and receita_pdf %}
+  <p><a class="botao botao-claro" href="{{ receita_url }}" target="_blank" rel="noopener">Abrir a receita (PDF)</a></p>
+{% elif receita_url %}
+  <a href="{{ receita_url }}" target="_blank" rel="noopener"><img class="receita" src="{{ receita_url }}" alt="Receita da aplicação"></a>
+{% else %}
+  <p class="vazio">Sem receita anexada.</p>
+{% endif %}
+{% endblock %}

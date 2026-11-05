@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titulo %}{{ "Editar talhão" if talhao else "Novo talhão" }} · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<form class="form caixa" method="post">
+  <h1>{{ "Editar " ~ talhao.nome if talhao else "Novo talhão" }}</h1>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  <label>Nome<input type="text" name="nome" required maxlength="60" value="{{ dados.nome or '' }}" placeholder="Talhão do Alto" autofocus></label>
+  <label>Área (hectares)<input type="text" inputmode="decimal" name="area_ha" required value="{{ dados.area_ha | num }}" placeholder="4,5"></label>
+  <label>Cultura
+    <input type="text" name="cultura" required maxlength="60" list="culturas" value="{{ dados.cultura or '' }}">
+    <datalist id="culturas">
+      <option value="Café arábica">
+      <option value="Café conilon">
+    </datalist>
+  </label>
+  <button type="submit">Salvar</button>
+  <a href="{{ url_for('telas.talhao', talhao_id=talhao.id) if talhao else url_for('telas.talhoes') }}">Cancelar</a>
+</form>
+{% endblock %}

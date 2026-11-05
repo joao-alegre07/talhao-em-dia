@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block titulo %}Talhão em Dia · caderno de campo no celular{% endblock %}
+{% block classe %}landing{% endblock %}
+{% block conteudo %}
+<header class="landing-topo">
+  <span class="marca">🌱 Talhão em Dia</span>
+  <a href="{{ url_for('auth.login') }}">Entrar</a>
+</header>
+
+<section class="hero">
+  <h1>O caderno de campo que o funcionário preenche no celular em meio minuto.</h1>
+  <p>
+    Cada aplicação registrada por talhão, com a foto da receita. O Talhão em Dia avisa quando
+    cada talhão está liberado pra colher e deixa o histórico pronto pra quando a cooperativa ou a
+    certificadora pedir.
+  </p>
+  <div class="hero-botoes">
+    <a class="botao" href="{{ url_for('auth.cadastro') }}">Criar conta grátis</a>
+    <a class="botao botao-claro" href="{{ url_for('auth.login') }}">Já tenho conta</a>
+  </div>
+  <p class="hero-nota">Pro pequeno produtor de café de Garça, Pompeia e Marília. Sem sistema de fazenda grande.</p>
+</section>
+
+<section class="secao">
+  <h2>Onde o caderno de papel falha</h2>
+  <div class="cards-3">
+    <article class="card">
+      <h3>Na véspera da colheita</h3>
+      <p>Colher antes de acabar a carência do defensivo deixa resíduo no grão. Pra saber se o talhão 3 já está liberado, hoje é preciso lembrar o que foi aplicado lá e achar a bula.</p>
+    </article>
+    <article class="card">
+      <h3>Na visita da certificadora</h3>
+      <p>O programa que paga ágio na saca pede o caderno: o quê, onde, quando, em que dose e com qual receita. Montar isso de nota fiscal e foto no WhatsApp leva dias.</p>
+    </article>
+    <article class="card">
+      <h3>No galpão</h3>
+      <p>O funcionário aplica e anota "quando dá", num papel que some. O histórico fica com buracos justo no mês que alguém vai perguntar.</p>
+    </article>
+  </div>
+</section>
+
+<section class="secao">
+  <h2>Como funciona</h2>
+  <ol class="passos">
+    <li><strong>Registro pelo celular.</strong> Talhão, produto, dose, quem aplicou e a foto da receita, logo depois de aplicar.</li>
+    <li><strong>Carência por talhão.</strong> Cada talhão mostra "em carência até 12/06" ou "liberado pra colher", contado a partir da bula de cada produto.</li>
+    <li><strong>A equipe na mesma propriedade.</strong> O funcionário registra, o agrônomo acompanha e o produtor vê tudo, cada um só na propriedade em que foi convidado.</li>
+  </ol>
+</section>
+
+<section class="secao">
+  <h2>Planos</h2>
+  {% include "_planos.html" %}
+  <p class="centro"><a class="botao" href="{{ url_for('auth.cadastro') }}">Começar no Free</a></p>
+</section>
+
+<section class="secao agronomo">
+  <h2>É agrônomo?</h2>
+  <p>Crie sua conta de agrônomo e acompanhe, com o mesmo login, as propriedades que você atende. O produtor te convida pelo link e você passa a ver os talhões e o caderno dele.</p>
+  <a class="botao botao-claro" href="{{ url_for('auth.cadastro', papel='agronomo') }}">Criar conta de agrônomo</a>
+</section>
+
+<footer class="rodape">
+  Talhão em Dia · projeto da disciplina ISW055 (Introdução à Computação em Nuvem), Fatec Pompeia
+</footer>
+{% endblock %}

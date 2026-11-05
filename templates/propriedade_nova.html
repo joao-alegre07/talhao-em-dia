@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}Sua propriedade · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<form class="form caixa" method="post">
+  <h1>Cadastre sua propriedade</h1>
+  <p>É nela que ficam os talhões, os produtos e o caderno. Depois você convida o funcionário e o agrônomo.</p>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  <label>Nome do sítio ou fazenda<input type="text" name="nome" required maxlength="100" value="{{ dados.nome or '' }}" placeholder="Sítio Boa Vista" autofocus></label>
+  <label>Município<input type="text" name="municipio" required maxlength="100" value="{{ dados.municipio or '' }}" placeholder="Garça"></label>
+  <button type="submit">Cadastrar propriedade</button>
+</form>
+{% endblock %}

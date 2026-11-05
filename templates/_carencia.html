@@ -1,0 +1,7 @@
+{% if t.liberado_em is none %}
+<span class="selo selo-neutro">sem aplicação registrada</span>
+{% elif t.em_carencia %}
+<span class="selo selo-carencia">em carência até {{ t.liberado_em | data }} · falta{{ "m" if t.dias_restantes > 1 }} {{ t.dias_restantes }} dia{{ "s" if t.dias_restantes > 1 }}</span>
+{% else %}
+<span class="selo selo-liberado">liberado pra colher desde {{ t.liberado_em | data }}</span>
+{% endif %}

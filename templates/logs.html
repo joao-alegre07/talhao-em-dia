@@ -1,47 +1,41 @@
 {% extends "base.html" %}
-{% block body %}
-<header class="topbar">
-  <h1>Log de auditoria</h1>
-  <nav class="topbar-links">
-    <a href="{{ url_for('movies.catalogo') }}">Catálogo</a>
-    <a class="logout" href="{{ url_for('auth.logout') }}">Sair</a>
-  </nav>
-</header>
-
-<main class="logs">
-  <p class="logs-info">Últimos {{ n }} eventos, do mais recente pro mais antigo.</p>
-
-  {% if erro %}
-    <p class="erro">{{ erro }}</p>
-  {% elif not eventos %}
-    <p>Nenhum evento registrado ainda.</p>
-  {% else %}
-  <div class="tabela-wrap">
-    <table class="tabela-logs">
-      <thead>
-        <tr>
-          <th>Horário (UTC)</th>
-          <th>Usuário</th>
-          <th>Ação</th>
-          <th>Serviço</th>
-          <th>IP</th>
-          <th>Detalhes</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for e in eventos %}
-        <tr class="acao-{{ e.acao }}">
-          <td>{{ e.timestamp }}</td>
-          <td>{{ e.usuario_id or "—" }}</td>
-          <td><span class="acao">{{ e.acao }}</span></td>
-          <td>{{ e.servico }}</td>
-          <td>{{ e.ip }}</td>
-          <td>{{ e.detalhes }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+{% block titulo %}Log · Talhão em Dia{% endblock %}
+{% block classe %}pagina-larga{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div>
+    <h1>Log de auditoria</h1>
+    <p class="sub">Últimos {{ n }} eventos, do mais recente pro mais antigo. Horário de Brasília.</p>
   </div>
-  {% endif %}
-</main>
+  <nav class="abas">
+    <a class="{{ 'ativa' if not so_negocio }}" href="{{ url_for('admin.logs', n=n) }}">Tudo</a>
+    <a class="{{ 'ativa' if so_negocio }}" href="{{ url_for('admin.logs', n=n, tipo='negocio') }}">Só eventos do negócio</a>
+  </nav>
+</div>
+
+{% if erro %}
+  <p class="erro">{{ erro }}</p>
+{% elif not eventos %}
+  <p class="vazio">Nenhum evento por aqui.</p>
+{% else %}
+<div class="tabela-wrap">
+  <table class="tabela tabela-logs">
+    <thead>
+      <tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Serviço</th><th>IP</th><th>Detalhes</th></tr>
+    </thead>
+    <tbody>
+      {% for e in eventos %}
+      <tr class="acao-{{ e.acao }}{{ ' negocio' if e.negocio }}">
+        <td class="nowrap">{{ e.quando }}</td>
+        <td>{% if e.quem %}{{ e.quem }} <small>#{{ e.usuario_id }}</small>{% else %}{{ ("#" ~ e.usuario_id) if e.usuario_id else "—" }}{% endif %}</td>
+        <td><span class="acao">{{ e.acao }}</span></td>
+        <td>{{ e.servico }}</td>
+        <td>{{ e.ip }}</td>
+        <td>{{ e.detalhes }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
 {% endblock %}

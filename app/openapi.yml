@@ -1,29 +1,40 @@
 openapi: 3.0.3
 info:
-  title: Tom Hanks Catalog
-  version: "1.0"
+  title: Talhão em Dia
+  version: "2.0"
   description: |
-    Rotas públicas do catálogo. É uma aplicação web tradicional: as rotas devolvem páginas HTML
-    e os formulários são enviados como `application/x-www-form-urlencoded` (ou `multipart/form-data`
-    no upload da foto). Depois de uma ação que dá certo, a resposta é um redirecionamento `302`.
+    API do caderno de campo (`/api/...`, JSON) e as rotas principais das telas.
 
-    **Pra usar o "Try it out":** faça login no site nesse mesmo navegador (ou pelo próprio
-    `POST /login` aqui embaixo). A sessão fica no cookie `session`, que o navegador já manda junto.
-    Sem login, as rotas protegidas redirecionam pra `/login` — como o navegador segue o
-    redirecionamento sozinho, o Swagger mostra o HTML da página de login.
+    **Pra usar o "Try it out":** faça login no site nesse mesmo navegador (ou pelo `POST /login`
+    aqui embaixo). A sessão fica no cookie `session`, que o navegador já manda junto. Sem login,
+    a API responde `401`.
+
+    **Quem pode o quê.** Ver é liberado pra qualquer membro da propriedade (dono, funcionário ou
+    agrônomo convidado). Alterar depende do papel, que é perguntado ao auth-service a cada
+    requisição:
+
+    | | produtor | funcionário | agrônomo |
+    |---|---|---|---|
+    | talhões e produtos | cria, edita, apaga | só vê | só vê |
+    | aplicações | registra, edita e apaga qualquer uma | registra; edita e apaga só as que registrou | só vê |
+
+    Papel sem permissão leva `403` antes de qualquer consulta, e a tentativa vai pro log como
+    `acesso_negado`. Registro de outra propriedade responde `404`, igual a um id que não existe.
 
     O auth-service e o log-service têm documentação própria, em `/apidocs` de cada um
     (só acessível rodando localmente, já que eles não têm porta pública).
 
 tags:
+  - name: aplicações
+    description: O caderno de campo, recurso principal
+  - name: talhões
+    description: As áreas da propriedade, com a carência calculada
+  - name: produtos
+    description: Defensivos da propriedade, com a carência da bula
   - name: contas
-    description: Cadastro, login e recuperação de senha (repassados pro auth-service)
-  - name: catálogo
-    description: Filmes, favoritos e comentários
-  - name: perfil
-    description: Página de perfil e foto
-  - name: premium
-    description: Assinatura do plano premium (Stripe, em modo de teste)
+    description: Cadastro, login, convites (repassados pro auth-service)
+  - name: plano
+    description: Assinatura do Pro (Stripe, em modo de teste)
   - name: admin
     description: Só pra quem tem papel admin
   - name: saúde
@@ -36,6 +47,122 @@ components:
       in: cookie
       name: session
       description: Cookie de sessão criado no login.
+  schemas:
+    Erro:
+      type: object
+      properties:
+        erro:
+          type: string
+    Talhao:
+      type: object
+      properties:
+        id: {type: integer, example: 3}
+        propriedade_id: {type: integer, example: 1}
+        propriedade: {type: string, example: Sítio Boa Vista}
+        nome: {type: string, example: Alto}
+        area_ha: {type: number, example: 4.5}
+        cultura: {type: string, example: Café arábica}
+        total_aplicacoes: {type: integer, example: 2}
+        liberado_em:
+          type: string
+          format: date
+          nullable: true
+          description: Dia em que vence a carência mais longa entre as aplicações do talhão. `null` sem aplicação.
+          example: "2026-11-27"
+        em_carencia: {type: boolean, example: true}
+        dias_restantes: {type: integer, example: 20}
+    TalhaoEntrada:
+      type: object
+      required: [nome, area_ha, cultura]
+      properties:
+        nome: {type: string, maxLength: 60, example: Alto}
+        area_ha:
+          type: string
+          description: Hectares. Aceita vírgula ("4,5") ou ponto.
+          example: "4,5"
+        cultura: {type: string, maxLength: 60, example: Café arábica}
+    Produto:
+      type: object
+      properties:
+        id: {type: integer, example: 2}
+        propriedade_id: {type: integer, example: 1}
+        nome: {type: string, example: Inseticida para bicho-mineiro}
+        carencia_dias: {type: integer, example: 30}
+        unidade: {type: string, enum: [L, kg], example: L}
+    ProdutoEntrada:
+      type: object
+      required: [nome, carencia_dias, unidade]
+      properties:
+        nome: {type: string, maxLength: 100, example: Inseticida para bicho-mineiro}
+        carencia_dias: {type: integer, minimum: 0, maximum: 365, example: 30}
+        unidade: {type: string, enum: [L, kg], example: L}
+    Aplicacao:
+      type: object
+      properties:
+        id: {type: integer, example: 12}
+        talhao_id: {type: integer, example: 3}
+        talhao: {type: string, example: Alto}
+        produto_id: {type: integer, example: 2}
+        produto: {type: string, example: Inseticida para bicho-mineiro}
+        unidade: {type: string, example: L}
+        carencia_dias: {type: integer, example: 30}
+        propriedade_id: {type: integer, example: 1}
+        propriedade: {type: string, example: Sítio Boa Vista}
+        data_aplicacao: {type: string, format: date, example: "2026-10-28"}
+        dose: {type: number, description: Por hectare, na unidade do produto., example: 0.5}
+        aplicador: {type: string, example: Diego}
+        observacao: {type: string, example: Mancha de bicho-mineiro na parte de cima.}
+        libera_em: {type: string, format: date, example: "2026-11-27"}
+        registrado_por: {type: integer, example: 8}
+        receita_url:
+          type: string
+          nullable: true
+          description: URL assinada da receita, válida por 10 minutos.
+          example: /arquivos/receitas/propriedades/1/receitas/3f2a.jpg?X-Amz-Signature=...
+        criado_em: {type: string, format: date-time}
+        atualizado_em: {type: string, format: date-time, nullable: true}
+    AplicacaoEntrada:
+      type: object
+      required: [talhao_id, produto_id, data_aplicacao, dose, aplicador]
+      properties:
+        talhao_id: {type: integer, example: 3}
+        produto_id:
+          type: integer
+          description: Tem que ser um produto da mesma propriedade do talhão.
+          example: 2
+        data_aplicacao:
+          type: string
+          format: date
+          description: Não pode ser no futuro.
+          example: "2026-10-28"
+        dose: {type: string, description: Por hectare. Aceita vírgula., example: "0,5"}
+        aplicador: {type: string, maxLength: 100, example: Diego}
+        observacao: {type: string, maxLength: 500, example: ""}
+    AplicacaoComReceita:
+      allOf:
+        - $ref: "#/components/schemas/AplicacaoEntrada"
+        - type: object
+          properties:
+            receita:
+              type: string
+              format: binary
+              description: Foto (JPG, PNG, WebP) ou PDF da receita, até 8 MB. Conferida pelos primeiros bytes, não pela extensão.
+  parameters:
+    TalhaoId:
+      name: talhao_id
+      in: path
+      required: true
+      schema: {type: integer, example: 3}
+    ProdutoId:
+      name: produto_id
+      in: path
+      required: true
+      schema: {type: integer, example: 2}
+    AplicacaoId:
+      name: aplicacao_id
+      in: path
+      required: true
+      schema: {type: integer, example: 12}
   responses:
     Html:
       description: Página HTML.
@@ -43,78 +170,325 @@ components:
         text/html:
           schema:
             type: string
-    RedirLogin:
-      description: Sem login. Redireciona pra `/login`.
-      headers:
-        Location:
-          schema:
-            type: string
-            example: /login
-    CampoFaltando:
-      description: Faltou um campo obrigatório do formulário.
+    SemLogin:
+      description: Sem login.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Erro"}
+          example: {"erro": "Faça login primeiro."}
+    Invalido:
+      description: Algum campo não passou na validação. A mensagem diz qual.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Erro"}
+          example: {"erro": "A data da aplicação não pode ser no futuro."}
     Proibido:
-      description: Sem permissão. A tentativa é registrada no log como `acesso_negado`.
+      description: O papel atual não permite a ação. A tentativa vai pro log como `acesso_negado`.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Erro"}
+          example: {"erro": "Seu papel não permite essa ação."}
     NaoEncontrado:
-      description: Não existe.
+      description: Não existe, ou é de uma propriedade de que você não faz parte.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Erro"}
+          example: {"erro": "Não encontrado."}
+    Conflito:
+      description: A ação esbarra em outro registro.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Erro"}
+
+security:
+  - sessao: []
 
 paths:
-  /cadastro:
+  /api/aplicacoes:
+    get:
+      tags: [aplicações]
+      summary: Lista o caderno
+      description: Todas as aplicações das propriedades de que você faz parte, da mais recente pra mais antiga.
+      parameters:
+        - name: talhao_id
+          in: query
+          required: false
+          description: Só as de um talhão.
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Lista (vazia se você não faz parte de nenhuma propriedade).
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Aplicacao"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+    post:
+      tags: [aplicações]
+      summary: Registra uma aplicação
+      description: >
+        Produtor e funcionário. Em JSON, ou em `multipart/form-data` pra mandar a receita junto.
+        Vira o evento `aplicacao_registrada` no log.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AplicacaoEntrada"}
+          multipart/form-data:
+            schema: {$ref: "#/components/schemas/AplicacaoComReceita"}
+      responses:
+        "201":
+          description: Registrada.
+          headers:
+            Location:
+              schema: {type: string, example: /api/aplicacoes/12}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Aplicacao"}
+        "400": {$ref: "#/components/responses/Invalido"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "403": {$ref: "#/components/responses/Proibido"}
+
+  /api/aplicacoes/{aplicacao_id}:
+    parameters:
+      - $ref: "#/components/parameters/AplicacaoId"
+    get:
+      tags: [aplicações]
+      summary: Detalha uma aplicação
+      responses:
+        "200":
+          description: A aplicação, com a data em que libera o talhão e a URL da receita.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Aplicacao"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "404": {$ref: "#/components/responses/NaoEncontrado"}
+    put:
+      tags: [aplicações]
+      summary: Edita uma aplicação
+      description: >
+        Produtor edita qualquer uma da propriedade dele; funcionário, só as que registrou. Sem
+        `receita`, a atual continua; com, a nova entra no lugar e a antiga é apagada do storage.
+        O evento `aplicacao_editada` leva o antes e o depois de cada campo que mudou.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AplicacaoEntrada"}
+          multipart/form-data:
+            schema: {$ref: "#/components/schemas/AplicacaoComReceita"}
+      responses:
+        "200":
+          description: Editada.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Aplicacao"}
+        "400": {$ref: "#/components/responses/Invalido"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "403": {$ref: "#/components/responses/Proibido"}
+        "404": {$ref: "#/components/responses/NaoEncontrado"}
+    delete:
+      tags: [aplicações]
+      summary: Apaga uma aplicação
+      description: Mesma regra da edição. A receita sai do storage junto.
+      responses:
+        "204":
+          description: Apagada.
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "403": {$ref: "#/components/responses/Proibido"}
+        "404": {$ref: "#/components/responses/NaoEncontrado"}
+
+  /api/talhoes:
+    get:
+      tags: [talhões]
+      summary: Lista os talhões com a situação da carência
+      responses:
+        "200":
+          description: Lista.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Talhao"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+    post:
+      tags: [talhões]
+      summary: Cadastra um talhão
+      description: Só produtor, na propriedade de que é dono.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TalhaoEntrada"}
+      responses:
+        "201":
+          description: Cadastrado.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Talhao"}
+        "400": {$ref: "#/components/responses/Invalido"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "403": {$ref: "#/components/responses/Proibido"}
+        "409":
+          $ref: "#/components/responses/Conflito"
+
+  /api/talhoes/{talhao_id}:
+    parameters:
+      - $ref: "#/components/parameters/TalhaoId"
+    get:
+      tags: [talhões]
+      summary: Detalha um talhão
+      responses:
+        "200":
+          description: O talhão.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Talhao"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "404": {$ref: "#/components/responses/NaoEncontrado"}
+    put:
+      tags: [talhões]
+      summary: Edita um talhão
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TalhaoEntrada"}
+      responses:
+        "200":
+          description: Editado.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Talhao"}
+        "400": {$ref: "#/components/responses/Invalido"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "403": {$ref: "#/components/responses/Proibido"}
+        "404": {$ref: "#/components/responses/NaoEncontrado"}
+        "409": {$ref: "#/components/responses/Conflito"}
+    delete:
+      tags: [talhões]
+      summary: Apaga um talhão
+      description: Só se ele não tiver nenhuma aplicação; o histórico do caderno não some junto.
+      responses:
+        "204":
+          description: Apagado.
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "403": {$ref: "#/components/responses/Proibido"}
+        "404": {$ref: "#/components/responses/NaoEncontrado"}
+        "409":
+          description: O talhão tem aplicações.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Erro"}
+
+  /api/produtos:
+    get:
+      tags: [produtos]
+      summary: Lista os produtos
+      responses:
+        "200":
+          description: Lista.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Produto"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+    post:
+      tags: [produtos]
+      summary: Cadastra um produto
+      description: Só produtor.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ProdutoEntrada"}
+      responses:
+        "201":
+          description: Cadastrado.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Produto"}
+        "400": {$ref: "#/components/responses/Invalido"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "403": {$ref: "#/components/responses/Proibido"}
+        "409": {$ref: "#/components/responses/Conflito"}
+
+  /api/produtos/{produto_id}:
+    parameters:
+      - $ref: "#/components/parameters/ProdutoId"
+    put:
+      tags: [produtos]
+      summary: Edita um produto
+      description: Mudar a carência muda a data de liberação dos talhões em que ele já foi aplicado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ProdutoEntrada"}
+      responses:
+        "200":
+          description: Editado.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Produto"}
+        "400": {$ref: "#/components/responses/Invalido"}
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "403": {$ref: "#/components/responses/Proibido"}
+        "404": {$ref: "#/components/responses/NaoEncontrado"}
+    delete:
+      tags: [produtos]
+      summary: Apaga um produto
+      description: Só se ele não aparecer em nenhuma aplicação.
+      responses:
+        "204":
+          description: Apagado.
+        "401": {$ref: "#/components/responses/SemLogin"}
+        "403": {$ref: "#/components/responses/Proibido"}
+        "404": {$ref: "#/components/responses/NaoEncontrado"}
+        "409": {$ref: "#/components/responses/Conflito"}
+
+  /:
     get:
       tags: [contas]
-      summary: Formulário de cadastro
+      summary: Landing page
+      description: Aberta, sem login. Quem já entrou é mandado pros talhões (ou pro log, se for admin).
+      security: []
       responses:
         "200":
           $ref: "#/components/responses/Html"
+
+  /cadastro:
     post:
       tags: [contas]
-      summary: Cria uma conta
+      summary: Cria uma conta de produtor ou de agrônomo
+      description: Funcionário não se cadastra aqui; entra pelo convite da propriedade.
+      security: []
       requestBody:
         required: true
         content:
           application/x-www-form-urlencoded:
             schema:
               type: object
-              required: [nome, email, senha]
+              required: [nome, email, senha, papel]
               properties:
-                nome:
-                  type: string
-                  example: Maria
-                email:
-                  type: string
-                  example: maria@exemplo.com
-                senha:
-                  type: string
-                  format: password
+                nome: {type: string, example: Marcos}
+                email: {type: string, example: marcos@exemplo.com}
+                senha: {type: string, format: password}
+                papel: {type: string, enum: [produtor, agronomo], example: produtor}
       responses:
         "302":
           description: Conta criada. Redireciona pra `/login`.
-          headers:
-            Location:
-              schema:
-                type: string
-                example: /login
-        "200":
-          description: >
-            Não cadastrou (campo vazio, e-mail já usado ou auth-service fora do ar).
-            Volta o formulário com a mensagem de erro.
-          content:
-            text/html:
-              schema:
-                type: string
         "400":
-          $ref: "#/components/responses/CampoFaltando"
+          description: Papel que não pode ser escolhido no cadastro.
 
   /login:
-    get:
-      tags: [contas]
-      summary: Formulário de login
-      responses:
-        "200":
-          $ref: "#/components/responses/Html"
     post:
       tags: [contas]
       summary: Faz login
       description: Confere a senha no auth-service e, se estiver certa, cria o cookie de sessão.
+      security: []
       requestBody:
         required: true
         content:
@@ -123,475 +497,122 @@ paths:
               type: object
               required: [email, senha]
               properties:
-                email:
-                  type: string
-                  example: maria@exemplo.com
-                senha:
-                  type: string
-                  format: password
+                email: {type: string, example: marcos@exemplo.com}
+                senha: {type: string, format: password}
       responses:
         "302":
-          description: Login certo. Cria o cookie `session` e redireciona pro catálogo.
-          headers:
-            Location:
-              schema:
-                type: string
-                example: /
-            Set-Cookie:
-              schema:
-                type: string
-                example: session=eyJub21lIjoi...; HttpOnly; Path=/
+          description: Login certo. Cria o cookie `session` e redireciona pros talhões.
         "200":
-          description: E-mail ou senha errados. Volta o formulário com a mensagem de erro.
-          content:
-            text/html:
-              schema:
-                type: string
-        "400":
-          $ref: "#/components/responses/CampoFaltando"
+          description: E-mail ou senha errados. Volta o formulário com a mensagem.
 
-  /logout:
+  /convite/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema: {type: string}
     get:
       tags: [contas]
-      summary: Sai da conta
-      responses:
-        "302":
-          description: Apaga a sessão e redireciona pra `/login`.
-
-  /esqueci-senha:
-    get:
-      tags: [contas]
-      summary: Formulário de esqueci a senha
+      summary: Página do convite
+      security: []
       responses:
         "200":
           $ref: "#/components/responses/Html"
-    post:
-      tags: [contas]
-      summary: Pede o link de redefinição por e-mail
-      description: >
-        A resposta é sempre a mesma, com ou sem conta cadastrada nesse e-mail, pra não dar pra
-        descobrir quem tem conta.
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required: [email]
-              properties:
-                email:
-                  type: string
-                  example: maria@exemplo.com
-      responses:
-        "200":
-          description: Página com a mensagem "Se esse e-mail estiver cadastrado, você vai receber um link".
-          content:
-            text/html:
-              schema:
-                type: string
-        "400":
-          $ref: "#/components/responses/CampoFaltando"
-
-  /resetar-senha:
-    get:
-      tags: [contas]
-      summary: Formulário de nova senha (link do e-mail)
-      parameters:
-        - name: token
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          $ref: "#/components/responses/Html"
-    post:
-      tags: [contas]
-      summary: Troca a senha
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required: [token, nova_senha]
-              properties:
-                token:
-                  type: string
-                nova_senha:
-                  type: string
-                  format: password
-      responses:
-        "302":
-          description: Senha trocada. Redireciona pra `/login?redefinida=1`.
-        "200":
-          description: Token inválido, já usado ou expirado. Volta o formulário com a mensagem de erro.
-          content:
-            text/html:
-              schema:
-                type: string
-        "400":
-          $ref: "#/components/responses/CampoFaltando"
-
-  /:
-    get:
-      tags: [catálogo]
-      summary: Catálogo paginado
-      description: 20 filmes por página, buscados na hora na API do TMDB.
-      security:
-        - sessao: []
-      parameters:
-        - name: page
-          in: query
-          description: Número da página. Fora do intervalo, é ajustado pra primeira ou última.
-          schema:
-            type: integer
-            default: 1
-      responses:
-        "200":
-          $ref: "#/components/responses/Html"
-        "302":
-          $ref: "#/components/responses/RedirLogin"
-
-  /favoritar:
-    post:
-      tags: [catálogo]
-      summary: Favorita ou desfavorita um filme
-      description: >
-        Se o filme já está nos favoritos, sai; se não está, entra. No plano gratuito cada usuário
-        tem até 5 favoritos; pra favoritar o sexto, o catálogo pergunta o plano atual pro
-        auth-service e só premium passa. Desfavoritar é sempre liberado.
-      security:
-        - sessao: []
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required: [tmdb_movie_id, titulo]
-              properties:
-                tmdb_movie_id:
-                  type: integer
-                  example: 13
-                titulo:
-                  type: string
-                  example: Forrest Gump
-                poster_path:
-                  type: string
-                  example: /arw2vcBveWOVZr6pxd9XTd1TdQa.jpg
-                page:
-                  type: integer
-                  description: Página do catálogo pra onde voltar.
-                  example: 1
-      responses:
-        "302":
-          description: Feito. Volta pro catálogo na mesma página (ou pra `/login`, sem sessão).
-        "400":
-          $ref: "#/components/responses/CampoFaltando"
-        "403":
-          description: Limite de favoritos do plano gratuito. Fica no log como `acesso_negado`.
-
-  /comentar:
-    post:
-      tags: [catálogo]
-      summary: Comenta num filme
-      description: Comentário vazio é ignorado.
-      security:
-        - sessao: []
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required: [tmdb_movie_id, texto]
-              properties:
-                tmdb_movie_id:
-                  type: integer
-                  example: 13
-                texto:
-                  type: string
-                  example: Um dos melhores dele.
-                page:
-                  type: integer
-                  example: 1
-      responses:
-        "302":
-          description: Feito. Volta pro catálogo na mesma página (ou pra `/login`, sem sessão).
-        "400":
-          $ref: "#/components/responses/CampoFaltando"
-
-  /comentarios/{comentario_id}/deletar:
-    post:
-      tags: [catálogo]
-      summary: Apaga um comentário
-      description: >
-        O autor pode apagar o próprio comentário. Pra apagar o de outra pessoa, o catálogo pergunta
-        o papel atual do usuário pro auth-service, e só admin passa.
-      security:
-        - sessao: []
-      parameters:
-        - name: comentario_id
-          in: path
-          required: true
-          schema:
-            type: integer
-            example: 42
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                page:
-                  type: integer
-                  example: 1
-      responses:
-        "302":
-          description: Apagado. Volta pro catálogo (ou pra `/login`, sem sessão).
-        "403":
-          $ref: "#/components/responses/Proibido"
         "404":
-          $ref: "#/components/responses/NaoEncontrado"
-
-  /premium:
-    get:
-      tags: [premium]
-      summary: Página do plano premium
-      description: Mostra o plano atual (perguntado na hora pro auth-service) e o botão de assinar.
-      security:
-        - sessao: []
-      parameters:
-        - name: sucesso
-          in: query
-          description: Volta do checkout pago. Só mostra um aviso; quem ativa o plano é o webhook.
-          schema:
-            type: integer
-            example: 1
-        - name: cancelado
-          in: query
-          description: Volta do checkout sem pagar.
-          schema:
-            type: integer
-            example: 1
-      responses:
-        "200":
-          $ref: "#/components/responses/Html"
-        "302":
-          $ref: "#/components/responses/RedirLogin"
-
-  /premium/assinar:
+          description: Convite que não existe, já foi usado ou passou dos 7 dias.
     post:
-      tags: [premium]
-      summary: Abre o checkout do Stripe
+      tags: [contas]
+      summary: Aceita o convite
       description: >
-        Cria uma Checkout Session (modo assinatura, preço `STRIPE_PRICE_ID`) com o id do usuário em
-        `client_reference_id` e redireciona pra página de pagamento do Stripe. O cartão é digitado
-        lá, nunca no catálogo. Quem já é premium volta pra `/premium`.
-      security:
-        - sessao: []
+        Sem login, cria a conta com o papel do convite (funcionário ou agrônomo) já dentro da
+        propriedade. Agrônomo logado só aceita e passa a acompanhar a propriedade.
+      security: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                nome: {type: string}
+                email: {type: string}
+                senha: {type: string, format: password}
+      responses:
+        "302":
+          description: Aceito.
+        "404":
+          description: Convite inválido.
+
+  /equipe/convites:
+    post:
+      tags: [contas]
+      summary: Gera um link de convite
+      description: Só produtor. O link vale 7 dias e uma vez só.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [papel]
+              properties:
+                papel: {type: string, enum: [funcionario, agronomo]}
+      responses:
+        "302":
+          description: Volta pra `/equipe` com o link novo em destaque.
+        "403":
+          description: Não é produtor.
+
+  /plano/assinar:
+    post:
+      tags: [plano]
+      summary: Abre o checkout do Pro no Stripe
+      description: Só produtor. O cartão é digitado na página do Stripe.
       responses:
         "303":
-          description: Redireciona pro checkout do Stripe.
-          headers:
-            Location:
-              schema:
-                type: string
-                example: https://checkout.stripe.com/c/pay/cs_test_a1b2c3...
-        "302":
-          $ref: "#/components/responses/RedirLogin"
-        "503":
-          description: Stripe ou auth-service não responderam.
+          description: Redireciona pra página de pagamento do Stripe.
+        "403":
+          description: Funcionário e agrônomo não assinam.
 
   /stripe/webhook:
     post:
-      tags: [premium]
-      summary: Webhook do Stripe
+      tags: [plano]
+      summary: Recebe os eventos do Stripe
       description: >
-        Chamado pelo Stripe, não pelo navegador. Confere o cabeçalho `Stripe-Signature` com o
-        segredo do endpoint (`STRIPE_WEBHOOK_SECRET`) antes de ler qualquer coisa do corpo.
-        `checkout.session.completed` pago liga o premium do usuário; `customer.subscription.deleted`
-        desliga. Outros eventos recebem `200` e são ignorados.
-      parameters:
-        - name: Stripe-Signature
-          in: header
-          required: true
-          schema:
-            type: string
-            example: t=1791580000,v1=5257a869e7ecebeda32affa62cdca3fa51cad7e77a0e56ff536d0ce8e108d8bd
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-            example:
-              id: evt_1Q8xYz2eZvKYlo2C
-              type: checkout.session.completed
-              data:
-                object:
-                  id: cs_test_a1b2c3
-                  client_reference_id: "7"
-                  payment_status: paid
-                  customer: cus_R2x9aB3cD4eF5g
-                  subscription: sub_1Q8xYz2eZvKYlo2C
+        Confere a `Stripe-Signature` e o horário antes de tudo. `checkout.session.completed` pago
+        liga o Pro; `customer.subscription.deleted` desliga.
+      security: []
       responses:
         "200":
-          description: Evento recebido.
-          content:
-            application/json:
-              example: {"recebido": true}
+          description: Recebido.
         "400":
-          description: Sem assinatura ou assinatura que não bate. Fica no log como `webhook_recusado`.
-          content:
-            application/json:
-              example: {"erro": "Assinatura inválida."}
+          description: Assinatura inválida ou antiga. Vai pro log como `webhook_recusado`.
         "503":
-          description: O auth-service não gravou o plano. O Stripe tenta de novo mais tarde.
+          description: O auth-service não gravou o plano; o Stripe manda de novo depois.
 
   /admin/logs:
     get:
       tags: [admin]
       summary: Log de auditoria
-      description: >
-        Últimos eventos do log-service, do mais recente pro mais antigo. Se o log-service estiver
-        fora do ar, a página abre com um aviso em vez da lista.
-      security:
-        - sessao: []
+      description: Últimos eventos do log-service, com o nome de quem fez e o horário de Brasília.
       parameters:
         - name: "n"
           in: query
-          description: Quantos eventos mostrar (de 1 a 500).
-          schema:
-            type: integer
-            default: 50
+          schema: {type: integer, default: 50, minimum: 1, maximum: 500}
+        - name: tipo
+          in: query
+          description: "`negocio` mostra só os eventos do negócio (sem login, logout e erros)."
+          schema: {type: string, enum: [negocio]}
       responses:
         "200":
           $ref: "#/components/responses/Html"
-        "302":
-          $ref: "#/components/responses/RedirLogin"
         "403":
-          $ref: "#/components/responses/Proibido"
-
-  /perfil:
-    get:
-      tags: [perfil]
-      summary: Meu perfil
-      security:
-        - sessao: []
-      responses:
-        "302":
-          description: Redireciona pra `/perfil/<seu id>` (ou pra `/login`, sem sessão).
-
-  /perfil/{usuario_id}:
-    get:
-      tags: [perfil]
-      summary: Perfil de um usuário
-      description: Nome, foto, bio e filmes favoritados. Qualquer usuário logado vê qualquer perfil.
-      security:
-        - sessao: []
-      parameters:
-        - name: usuario_id
-          in: path
-          required: true
-          schema:
-            type: integer
-            example: 1
-      responses:
-        "200":
-          $ref: "#/components/responses/Html"
-        "302":
-          $ref: "#/components/responses/RedirLogin"
-        "404":
-          $ref: "#/components/responses/NaoEncontrado"
-        "503":
-          description: auth-service fora do ar.
-
-  /perfil/{usuario_id}/editar:
-    post:
-      tags: [perfil]
-      summary: Edita bio e foto do próprio perfil
-      description: >
-        O id da URL precisa ser o mesmo da sessão — nem admin edita o perfil de outra pessoa.
-        A foto é conferida pelos primeiros bytes do arquivo, não pela extensão.
-      security:
-        - sessao: []
-      parameters:
-        - name: usuario_id
-          in: path
-          required: true
-          schema:
-            type: integer
-            example: 1
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                bio:
-                  type: string
-                  maxLength: 280
-                  example: Fã de Náufrago.
-                foto:
-                  type: string
-                  format: binary
-                  description: JPG, PNG ou WebP de até 2 MB. Opcional; sem foto, mantém a atual.
-      responses:
-        "302":
-          description: Salvo. Redireciona pro perfil (ou pra `/login`, sem sessão).
-        "400":
-          description: Bio com mais de 280 caracteres, foto acima de 2 MB ou arquivo que não é JPG/PNG/WebP.
-          content:
-            text/html:
-              schema:
-                type: string
-        "403":
-          $ref: "#/components/responses/Proibido"
-        "413":
-          description: Requisição inteira acima de 5 MB.
-        "503":
-          description: Não conseguiu salvar a foto no object storage.
-
-  /fotos/{caminho}:
-    get:
-      tags: [perfil]
-      summary: Foto de perfil (URL pré-assinada)
-      description: >
-        Repassa a URL assinada pro Garage. Essa URL é gerada na página de perfil e vale 10 minutos;
-        a query string traz a assinatura (`X-Amz-Algorithm`, `X-Amz-Credential`, `X-Amz-Date`,
-        `X-Amz-Expires`, `X-Amz-SignedHeaders`, `X-Amz-Signature`).
-      parameters:
-        - name: caminho
-          in: path
-          required: true
-          schema:
-            type: string
-            example: fotos-perfil/perfis/1/3f2a9c1e.png
-      responses:
-        "200":
-          description: A imagem.
-          content:
-            image/*:
-              schema:
-                type: string
-                format: binary
-        "403":
-          description: Assinatura inválida ou vencida.
-        "404":
-          $ref: "#/components/responses/NaoEncontrado"
-        "503":
-          description: Object storage fora do ar.
+          description: Não é admin.
 
   /health:
     get:
       tags: [saúde]
-      summary: "Readiness: o catálogo consegue falar com o MariaDB e com o Garage"
-      description: >
-        É pra cá que aponta o HEALTHCHECK do Docker. Faz um `SELECT 1` no MariaDB e um `HeadBucket`
-        no Garage, cada um com timeout de 2 segundos. O auth e o log não entram aqui: cada um tem o
-        próprio `/health`.
+      summary: Readiness (MariaDB e Garage)
+      security: []
       responses:
         "200":
           description: Tudo certo.
@@ -602,30 +623,22 @@ paths:
           description: Alguma dependência fora do ar.
           content:
             application/json:
-              example: {"status": "falhou", "dependencias": {"mariadb": "ok", "garage": "falhou: EndpointConnectionError"}}
+              example: {"status": "falhou", "dependencias": {"mariadb": "falhou: OperationalError", "garage": "ok"}}
 
   /health/live:
     get:
       tags: [saúde]
-      summary: "Liveness: o processo está de pé e respondendo"
+      summary: Liveness
+      security: []
       responses:
         "200":
           description: Vivo.
-          content:
-            application/json:
-              example: {"status": "ok"}
 
   /metrics:
     get:
       tags: [saúde]
       summary: Métricas no formato do Prometheus
-      description: >
-        Contagem de requisições e latência por rota (`url_rule`), método e status, em
-        `flask_http_request_duration_seconds` (histograma). O `/health` não entra na contagem.
+      security: []
       responses:
         "200":
           description: Texto no formato de exposição do Prometheus.
-          content:
-            text/plain:
-              schema:
-                type: string

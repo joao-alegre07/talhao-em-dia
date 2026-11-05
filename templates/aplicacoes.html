@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Caderno de campo · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <h1>Caderno de campo</h1>
+  {% if pode_registrar and talhoes %}
+  <div class="acoes"><a class="botao" href="{{ url_for('telas.nova_aplicacao', talhao_id=talhao_id) }}">+ Registrar aplicação</a></div>
+  {% endif %}
+</div>
+
+{% if talhoes %}
+<form class="filtro" method="get">
+  <label>Talhão
+    <select name="talhao_id" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for t in talhoes %}
+      <option value="{{ t.id }}" {{ "selected" if t.id == talhao_id }}>{{ t.nome }}{% if talhoes | map(attribute="propriedade_id") | unique | list | length > 1 %} ({{ t.propriedade }}){% endif %}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <noscript><button type="submit">Filtrar</button></noscript>
+</form>
+{% endif %}
+
+{% if aplicacoes %}
+  {% include "_aplicacoes.html" %}
+{% else %}
+  <p class="vazio">Nenhuma aplicação registrada{{ " neste talhão" if talhao_id }}.</p>
+{% endif %}
+{% endblock %}

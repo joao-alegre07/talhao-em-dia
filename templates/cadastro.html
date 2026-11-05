@@ -1,14 +1,21 @@
 {% extends "base.html" %}
-{% block body %}
-<main class="auth-page">
-  <form class="auth-form" method="post">
-    <h1>Criar conta</h1>
-    {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
-    <label>Nome<input type="text" name="nome" required autofocus></label>
-    <label>E-mail<input type="email" name="email" required></label>
-    <label>Senha<input type="password" name="senha" required minlength="6"></label>
-    <button type="submit">Cadastrar</button>
-    <p>Já tem conta? <a href="{{ url_for('auth.login') }}">Entrar</a></p>
-  </form>
-</main>
+{% block titulo %}Criar conta · Talhão em Dia{% endblock %}
+{% block classe %}pagina-estreita{% endblock %}
+{% block conteudo %}
+<a class="marca marca-solta" href="{{ url_for('inicio.landing') }}">🌱 Talhão em Dia</a>
+<form class="form caixa" method="post">
+  <h1>Criar conta</h1>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  <fieldset class="escolha">
+    {% for valor, rotulo in papeis.items() %}
+    <label><input type="radio" name="papel" value="{{ valor }}" {{ "checked" if valor == papel }}> {{ rotulo }}</label>
+    {% endfor %}
+  </fieldset>
+  <p class="dica">Funcionário não se cadastra aqui: entra pelo link de convite que o produtor manda.</p>
+  <label>Nome<input type="text" name="nome" required maxlength="100" autofocus></label>
+  <label>E-mail<input type="email" name="email" required maxlength="150"></label>
+  <label>Senha<input type="password" name="senha" required minlength="6"></label>
+  <button type="submit">Cadastrar</button>
+  <p>Já tem conta? <a href="{{ url_for('auth.login') }}">Entrar</a></p>
+</form>
 {% endblock %}

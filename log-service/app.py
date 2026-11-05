@@ -14,7 +14,7 @@ Swagger(
         "info": {
             "title": "log-service",
             "version": "1.0",
-            "description": "Serviço interno de auditoria. Recebe eventos do catálogo e do "
+            "description": "Serviço interno de auditoria. Recebe eventos do app e do "
             "auth-service e guarda num Redis Stream. Sem porta pública: em produção só é "
             "alcançado pela rede do Docker.",
         },
@@ -25,11 +25,11 @@ Swagger(
                     "properties": {
                         "id": {"type": "string", "example": "1759268412345-0"},
                         "usuario_id": {"type": "string", "example": "6"},
-                        "acao": {"type": "string", "example": "favoritar"},
+                        "acao": {"type": "string", "example": "aplicacao_registrada"},
                         "timestamp": {"type": "string", "example": "2026-09-30T21:40:12+00:00"},
                         "ip": {"type": "string", "example": "177.10.20.30"},
-                        "servico": {"type": "string", "example": "catalogo"},
-                        "detalhes": {"type": "string", "example": "filme 13 (Forrest Gump)"},
+                        "servico": {"type": "string", "example": "app"},
+                        "detalhes": {"type": "string", "example": "aplicação 12 no talhão Alto (3)"},
                     },
                 },
                 "Erro": {
@@ -111,7 +111,7 @@ def registrar():
             properties:
               acao:
                 type: string
-                example: favoritar
+                example: aplicacao_registrada
               usuario_id:
                 type: integer
                 nullable: true
@@ -121,10 +121,10 @@ def registrar():
                 example: 177.10.20.30
               servico:
                 type: string
-                example: catalogo
+                example: app
               detalhes:
                 type: string
-                example: filme 13 (Forrest Gump)
+                example: aplicação 12 no talhão Alto (3)
     responses:
       201:
         description: Evento gravado. O timestamp é definido pelo log-service.

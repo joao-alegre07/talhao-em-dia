@@ -3,10 +3,38 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Catálogo Tom Hanks</title>
+  <title>{% block titulo %}Talhão em Dia{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  {% block body %}{% endblock %}
+  {% if session.usuario_id %}
+  <header class="topo">
+    <a class="marca" href="{{ url_for('inicio.landing') }}">🌱 Talhão em Dia</a>
+    <nav class="menu">
+      {% if session.role == "admin" %}
+        <a href="{{ url_for('admin.logs') }}">Log</a>
+      {% else %}
+        <a href="{{ url_for('telas.talhoes') }}">Talhões</a>
+        <a href="{{ url_for('telas.aplicacoes') }}">Caderno</a>
+        <a href="{{ url_for('telas.produtos') }}">Produtos</a>
+        {% if session.role == "produtor" %}
+        <a href="{{ url_for('propriedade.equipe') }}">Equipe</a>
+        <a href="{{ url_for('plano.pagina') }}">Plano</a>
+        {% endif %}
+      {% endif %}
+    </nav>
+    <div class="quem">
+      <span>{{ session.nome }} · {{ nomes_dos_papeis.get(session.role, session.role) }}</span>
+      <a href="{{ url_for('auth.logout') }}">Sair</a>
+    </div>
+  </header>
+  {% endif %}
+
+  <main class="{% block classe %}pagina{% endblock %}">
+    {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+      <p class="aviso{{ ' aviso-erro' if categoria == 'erro' }}">{{ mensagem }}</p>
+    {% endfor %}
+    {% block conteudo %}{% endblock %}
+  </main>
 </body>
 </html>

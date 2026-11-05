@@ -3,13 +3,13 @@ import os
 
 import requests
 import stripe
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 
+from .acesso import exigir, usuario_atual
 from .auditoria import registrar
-from .auth import consultar_usuario, login_required
-from .movies import LIMITE_FAVORITOS_GRATIS
+from .auth import login_required
 
-premium_bp = Blueprint("premium", __name__)
+plano_bp = Blueprint("plano", __name__)
 
 
 def _url_publica(endpoint, **params):
@@ -18,12 +18,12 @@ def _url_publica(endpoint, **params):
 
 
 def _mostrar(erro=None, status=200):
-    usuario = consultar_usuario(session["usuario_id"])
+    usuario = usuario_atual()
     return (
         render_template(
-            "premium.html",
-            premium=bool(usuario and usuario.get("premium")),
-            limite_favoritos=LIMITE_FAVORITOS_GRATIS,
+            "plano.html",
+            pro=usuario["premium"],
+            pode_assinar=usuario["papel"] == "produtor",
             sucesso="sucesso" in request.args,
             cancelado="cancelado" in request.args,
             erro=erro,
@@ -32,12 +32,12 @@ def _mostrar(erro=None, status=200):
     )
 
 
-def _alterar_plano(usuario_id, premium, customer_id=None, subscription_id=None):
+def _alterar_plano(usuario_id, pro, customer_id=None, subscription_id=None):
     try:
         resp = requests.put(
             os.environ["AUTH_SERVICE_URL"].rstrip("/") + f"/usuarios/{usuario_id}/plano",
             json={
-                "premium": premium,
+                "premium": pro,
                 "stripe_customer_id": customer_id,
                 "stripe_subscription_id": subscription_id,
             },
@@ -48,44 +48,43 @@ def _alterar_plano(usuario_id, premium, customer_id=None, subscription_id=None):
     return resp.status_code == 200
 
 
-@premium_bp.route("/premium")
+@plano_bp.route("/plano")
 @login_required
 def pagina():
     return _mostrar()
 
 
-@premium_bp.route("/premium/assinar", methods=["POST"])
+@plano_bp.route("/plano/assinar", methods=["POST"])
 @login_required
 def assinar():
-    usuario_id = session["usuario_id"]
-    usuario = consultar_usuario(usuario_id)
-    if usuario is None:
-        return _mostrar(erro="Serviço de login indisponível. Tente de novo.", status=503)
-    if usuario.get("premium"):
-        return redirect(url_for("premium.pagina"))
+    # Quem assina é o dono da propriedade; funcionário e agrônomo entram de
+    # graça na propriedade dele.
+    usuario = exigir("plano")
+    if usuario["premium"]:
+        return redirect(url_for("plano.pagina"))
 
-    # O cartão é digitado na página do Stripe, não aqui. O catálogo só diz qual
+    # O cartão é digitado na página do Stripe, não aqui. O app só diz qual
     # preço e quem está assinando; o client_reference_id volta no webhook e é
-    # por ele que dá pra saber qual usuário pagou.
+    # por ele que dá pra saber quem pagou.
     try:
         checkout = stripe.checkout.Session.create(
             api_key=os.environ["STRIPE_SECRET_KEY"],
             mode="subscription",
             line_items=[{"price": os.environ["STRIPE_PRICE_ID"], "quantity": 1}],
-            client_reference_id=str(usuario_id),
+            client_reference_id=str(usuario["id"]),
             customer_email=usuario["email"],
-            subscription_data={"metadata": {"usuario_id": str(usuario_id)}},
-            success_url=_url_publica("premium.pagina", sucesso=1),
-            cancel_url=_url_publica("premium.pagina", cancelado=1),
+            subscription_data={"metadata": {"usuario_id": str(usuario["id"])}},
+            success_url=_url_publica("plano.pagina", sucesso=1),
+            cancel_url=_url_publica("plano.pagina", cancelado=1),
         )
     except stripe.StripeError:
         return _mostrar(erro="Não foi possível abrir o pagamento agora. Tente de novo.", status=503)
 
-    registrar("checkout_premium", detalhes=checkout.id)
+    registrar("checkout_pro", detalhes=checkout.id)
     return redirect(checkout.url, code=303)
 
 
-@premium_bp.route("/stripe/webhook", methods=["POST"])
+@plano_bp.route("/stripe/webhook", methods=["POST"])
 def webhook():
     payload = request.get_data()
 
@@ -118,7 +117,7 @@ def webhook():
             ):
                 return jsonify(erro="Não foi possível gravar o plano."), 503
             registrar(
-                "premium_ativado",
+                "pro_ativado",
                 usuario_id=int(usuario_id),
                 detalhes=f"assinatura {objeto.get('subscription')} ({evento['id']})",
             )
@@ -129,7 +128,7 @@ def webhook():
             if not _alterar_plano(int(usuario_id), False):
                 return jsonify(erro="Não foi possível gravar o plano."), 503
             registrar(
-                "premium_cancelado",
+                "pro_cancelado",
                 usuario_id=int(usuario_id),
                 detalhes=f"assinatura {objeto.get('id')} ({evento['id']})",
             )

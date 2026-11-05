@@ -20,7 +20,7 @@ Swagger(
             "title": "auth-service",
             "version": "1.0",
             "description": "Serviço interno de autenticação: cadastro, login, papéis e "
-            "recuperação de senha. Sem porta pública: em produção só o catálogo fala com ele, "
+            "recuperação de senha. Sem porta pública: em produção só o app fala com ele, "
             "pela rede do Docker.",
         },
         "components": {
@@ -41,6 +41,9 @@ Swagger(
 PrometheusMetrics(app, group_by="url_rule", excluded_paths=["^/health"])
 
 TOKEN_VALIDADE_MINUTOS = 30
+
+# admin fica de fora: é papel da plataforma e só muda direto no banco.
+PAPEIS_DO_CADASTRO = ("produtor", "funcionario", "agronomo")
 
 
 @app.route("/health/live")
@@ -93,9 +96,13 @@ def ready():
 
 @app.route("/cadastro", methods=["POST"])
 def cadastro():
-    """Cria uma conta nova (sempre com papel usuario)
+    """Cria uma conta nova com um dos papéis do negócio
     ---
     tags: [contas]
+    description: >
+      O papel é produtor, funcionario ou agronomo (sem papel, produtor). admin nunca nasce pelo
+      cadastro. Quem decide se a pessoa pode ser funcionário é o app, que só manda esse papel
+      depois de conferir o convite da propriedade.
     requestBody:
       required: true
       content:
@@ -106,13 +113,17 @@ def cadastro():
             properties:
               nome:
                 type: string
-                example: Maria
+                example: Marcos
               email:
                 type: string
-                example: maria@exemplo.com
+                example: marcos@exemplo.com
               senha:
                 type: string
                 example: umasenhaqualquer
+              papel:
+                type: string
+                enum: [produtor, funcionario, agronomo]
+                example: produtor
     responses:
       201:
         description: Conta criada.
@@ -120,12 +131,16 @@ def cadastro():
           application/json:
             example: {"id": 7}
       400:
-        description: Algum campo veio vazio.
+        description: Algum campo veio vazio ou o papel não existe.
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Erro'
-            example: {"erro": "Preencha todos os campos."}
+            examples:
+              vazio:
+                value: {"erro": "Preencha todos os campos."}
+              papel:
+                value: {"erro": "Papel inválido."}
       409:
         description: Já existe conta com esse e-mail.
         content:
@@ -138,9 +153,12 @@ def cadastro():
     nome = (dados.get("nome") or "").strip()
     email = (dados.get("email") or "").strip().lower()
     senha = dados.get("senha") or ""
+    papel = dados.get("papel") or "produtor"
 
     if not nome or not email or not senha:
         return jsonify(erro="Preencha todos os campos."), 400
+    if papel not in PAPEIS_DO_CADASTRO:
+        return jsonify(erro="Papel inválido."), 400
 
     senha_hash = generate_password_hash(senha)
 
@@ -153,8 +171,8 @@ def cadastro():
 
             cur.execute(
                 "INSERT INTO usuarios (nome, email, senha_hash, role) "
-                "VALUES (%s, %s, %s, 'usuario')",
-                (nome, email, senha_hash),
+                "VALUES (%s, %s, %s, %s)",
+                (nome, email, senha_hash, papel),
             )
             usuario_id = cur.lastrowid
     finally:
@@ -185,14 +203,14 @@ def login():
                 example: umasenhaqualquer
               ip:
                 type: string
-                description: IP de quem tentou logar, repassado pelo catálogo pro log.
+                description: IP de quem tentou logar, repassado pelo app pro log.
                 example: 177.10.20.30
     responses:
       200:
         description: Login certo.
         content:
           application/json:
-            example: {"usuario_id": 7, "nome": "Maria", "role": "usuario"}
+            example: {"usuario_id": 7, "nome": "Maria", "role": "produtor"}
       401:
         description: E-mail não cadastrado ou senha errada (mesma resposta nos dois casos).
         content:
@@ -230,12 +248,55 @@ def login():
     return jsonify(usuario_id=usuario["id"], nome=usuario["nome"], role=usuario["role"])
 
 
+@app.route("/usuarios", methods=["GET"])
+def listar_usuarios():
+    """Nome e papel de vários usuários de uma vez
+    ---
+    tags: [contas]
+    description: >
+      Usada pelo app pra mostrar nomes na equipe da propriedade e no log, sem uma chamada por pessoa.
+      Não devolve e-mail.
+    parameters:
+      - name: ids
+        in: query
+        required: true
+        description: Ids separados por vírgula (até 200).
+        schema:
+          type: string
+          example: 7,8,12
+    responses:
+      200:
+        description: Os usuários encontrados; ids que não existem ficam de fora.
+        content:
+          application/json:
+            example: [{"id": 7, "nome": "Marcos", "role": "produtor"}, {"id": 8, "nome": "Diego", "role": "funcionario"}]
+    """
+    ids = []
+    for parte in request.args.get("ids", "").split(","):
+        if parte.strip().isdigit():
+            ids.append(int(parte))
+    ids = sorted(set(ids))[:200]
+    if not ids:
+        return jsonify([])
+
+    marcadores = ", ".join(["%s"] * len(ids))
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT id, nome, role FROM usuarios WHERE id IN ({marcadores})", ids)
+            usuarios = cur.fetchall()
+    finally:
+        conn.close()
+
+    return jsonify(usuarios)
+
+
 @app.route("/usuarios/<int:usuario_id>", methods=["GET"])
 def obter_usuario(usuario_id):
     """Dados e papel atual de um usuário
     ---
     tags: [contas]
-    description: O catálogo chama essa rota antes de cada ação de admin, pra checar o papel na hora.
+    description: O app chama essa rota a cada ação que depende do papel, pra conferir o papel atual na hora.
     parameters:
       - name: usuario_id
         in: path
@@ -248,7 +309,7 @@ def obter_usuario(usuario_id):
         description: Usuário encontrado.
         content:
           application/json:
-            example: {"id": 7, "nome": "Maria", "email": "maria@exemplo.com", "role": "usuario", "premium": false}
+            example: {"id": 7, "nome": "Maria", "email": "maria@exemplo.com", "role": "produtor", "premium": false}
       404:
         description: Não existe usuário com esse id.
         content:
@@ -281,7 +342,7 @@ def alterar_plano(usuario_id):
     ---
     tags: [contas]
     description: >
-      Chamada pelo catálogo depois de validar a assinatura de um webhook do Stripe. Guarda só os
+      Chamada pelo app depois de validar a assinatura de um webhook do Stripe. Guarda só os
       IDs do cliente e da assinatura no Stripe, nunca dado de cartão. Repetir a mesma chamada não
       muda nada (o Stripe pode entregar o mesmo evento mais de uma vez).
     parameters:
@@ -379,7 +440,7 @@ def esqueci_senha():
                 example: maria@exemplo.com
               base_url:
                 type: string
-                description: Endereço público do catálogo, usado pra montar o link.
+                description: Endereço público do app, usado pra montar o link.
                 example: https://joao-alegre-isw055.lapps.studio
     responses:
       200:

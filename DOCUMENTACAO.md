@@ -1,10 +1,8 @@
-# Documentação do Tom Hanks Catalog
+# Documentação do Talhão em Dia
 
-Documentação do sistema escrita no fim da série, relendo o código e os commits dos últimos dois
-meses, como se fosse um sistema herdado sem documento nenhum. Tudo aqui descreve o que o código faz
-hoje; cada regra de negócio aponta pra linha de onde ela foi tirada.
-
-A classificação de cada peça em SaaS, PaaS ou IaaS está no [README](README.md#saas-paas-e-iaas).
+Documentação do sistema depois da troca de domínio da atividade 10. Mesmo formato da atividade 8:
+tudo aqui descreve o que o código faz hoje, e cada regra de negócio aponta pra linha de onde ela foi
+tirada. O plano de negócio, a arquitetura resumida e como rodar estão no [README](README.md).
 
 1. [Especificação](#1-especificação)
 2. [Arquitetura](#2-arquitetura)
@@ -15,193 +13,137 @@ A classificação de cada peça em SaaS, PaaS ou IaaS está no [README](README.m
 
 ## 1. Especificação
 
-O Tom Hanks Catalog é um catálogo da filmografia do Tom Hanks em que cada pessoa tem uma conta,
-favorita filmes, comenta e monta um perfil com foto. Existe um plano pago (Premium) e um papel de
-administrador que modera comentários e consulta o log de auditoria.
+O Talhão em Dia é o caderno de campo do pequeno produtor de café. Cada propriedade (o sítio) tem
+talhões, os produtos que usa e o caderno com as aplicações. A partir da carência de cada produto, o
+sistema mostra quando cada talhão está liberado pra colher. O produtor convida o funcionário e o
+agrônomo pra mesma propriedade, e cada pessoa só enxerga as propriedades de que faz parte.
 
 ### Quem usa
 
 | Perfil | O que pode fazer |
 |---|---|
-| Visitante (sem login) | Criar conta, entrar e pedir a recuperação de senha. Mais nada: qualquer outra página manda pro login. |
-| Usuário, plano gratuito | Ver o catálogo, favoritar até 5 filmes, comentar, apagar os próprios comentários, ver qualquer perfil e editar o próprio. |
-| Usuário Premium | O mesmo, com favoritos sem limite e o selo ★ Premium no perfil. |
-| Administrador (`admin`) | Tudo o que um usuário faz, mais apagar comentário de qualquer pessoa e consultar o log de auditoria. |
+| Visitante (sem login) | Ver a landing page, criar conta de produtor ou de agrônomo, entrar, pedir a recuperação de senha e abrir um link de convite. |
+| Produtor (`produtor`) | Cadastrar a propriedade; cadastrar, editar e apagar talhões e produtos; registrar, editar e apagar qualquer aplicação da propriedade; convidar funcionário e agrônomo; assinar o Pro. |
+| Funcionário (`funcionario`) | Só entra por convite. Vê os talhões, produtos e o caderno da propriedade em que entrou; registra aplicações e edita ou apaga só as que ele mesmo registrou. |
+| Agrônomo (`agronomo`) | Cria a conta sozinho ou pelo convite. Vê os talhões, produtos e o caderno das propriedades que o convidaram, sem alterar nada. |
+| Administrador (`admin`) | Papel da plataforma: consulta o log de auditoria. Não faz parte de nenhuma propriedade, então não vê dado de cliente. Só muda direto no banco. |
 
-Papel e plano são independentes: um admin pode estar no plano gratuito ou no Premium. Não existe
-tela pra tornar alguém admin; toda conta nasce `usuario` e o papel só muda direto no banco.
+### Landing, cadastro e login
 
-### Cadastro e login
+- **/** é a landing page: a dor, como funciona, a tabela Free × Pro e os botões **Criar conta
+  grátis** e **Criar conta de agrônomo**. Quem já entrou é mandado direto pros talhões (ou pro log,
+  se for admin).
+- Em **/cadastro** a pessoa escolhe "Sou produtor" ou "Sou agrônomo" e informa nome, e-mail e
+  senha. Funcionário não aparece ali: entra só pelo convite.
+- Em **/login** entra com e-mail e senha. Errando qualquer um dos dois, a mensagem é sempre "E-mail
+  ou senha inválidos.".
+- **/esqueci-senha** e **/resetar-senha** continuam como antes: link por e-mail, válido por 30
+  minutos e de uso único.
 
-- Em **/cadastro** a pessoa informa nome, e-mail e senha. Com tudo certo, volta pra tela de login;
-  se o e-mail já tiver conta, aparece "E-mail já cadastrado."
-- Em **/login** entra com e-mail e senha e cai no catálogo. Errando qualquer um dos dois, a mensagem
-  é sempre "E-mail ou senha inválidos.", sem dizer qual estava errado.
-- **Sair**, no topo de todas as páginas, encerra a sessão.
+### Propriedade e equipe
 
-### Recuperação de senha
+- O produtor sem propriedade é mandado pra **/propriedade/nova** (nome do sítio e município) e
+  depois direto pro cadastro do primeiro talhão.
+- **Equipe** lista quem faz parte da propriedade, com o papel e a data em que entrou, e tem os
+  botões **Convidar funcionário** e **Convidar agrônomo**. Cada clique gera um link que vale 7 dias
+  e uma vez só, com os botões **Copiar** e **WhatsApp**.
+- Quem abre o link sem estar logado vê "Você foi convidado pra entrar na propriedade X como
+  funcionário" e cria a conta ali mesmo, já dentro da propriedade. Um agrônomo que já tem conta
+  entra e aceita com **Acompanhar a propriedade**.
 
-- Em **/esqueci-senha** a pessoa digita o e-mail e sempre vê a mesma resposta: "Se esse e-mail
-  estiver cadastrado, você vai receber um link em instantes."
-- Se a conta existir, chega um e-mail com um link pra **/resetar-senha**, válido por 30 minutos e
-  que só funciona uma vez. Lá ela escolhe a senha nova e volta pro login.
+### Talhões e carência
 
-### Catálogo
+- **Talhões** é a página inicial: um cartão por talhão, agrupado por propriedade, com área, cultura,
+  quantas aplicações tem e a situação:
+  - "em carência até 30/11/2026 · faltam 33 dias", em vermelho;
+  - "liberado pra colher desde 15/10/2026", em verde;
+  - "sem aplicação registrada".
+- O detalhe do talhão mostra a mesma situação e as aplicações feitas nele. **Editar** e **Apagar**
+  só aparecem pro produtor.
 
-A página inicial (depois do login) lista os filmes do Tom Hanks buscados na hora na API do TMDB: do
-lançamento mais recente pro mais antigo, só os que têm pôster, 20 por página. Cada filme mostra
-pôster, título, data de lançamento, sinopse, o botão de favoritar e os comentários. O topo tem
-**Meu perfil**, **Seja Premium** (ou **★ Premium** pra quem assina), **Logs** (só pra admin) e
-**Sair**; embaixo, **Anterior** / **Próxima**.
+### Produtos
 
-### Favoritos
+- Tabela com nome, carência, unidade da dose (L/ha ou kg/ha) e em quantas aplicações o produto
+  aparece. O produtor cadastra embaixo e edita ou apaga em cada linha; **Apagar** só aparece em
+  produto que nunca foi aplicado.
 
-- O botão alterna entre **☆ Favoritar** e **★ Favoritado**.
-- No plano gratuito aparece uma faixa "Plano gratuito: X de 5 favoritos". Chegando a 5, os filmes que
-  ainda não são favoritos ficam com o botão bloqueado em "Limite do plano gratuito". Tirar um
-  favorito continua liberado.
-- Os favoritos aparecem no perfil da pessoa, do mais recente pro mais antigo.
+### Caderno de campo (aplicações)
 
-### Comentários
+- **Caderno** lista as aplicações da mais recente pra mais antiga, com filtro por talhão: data,
+  talhão, produto, dose, quem aplicou, até quando dura a carência (em vermelho se ainda não passou)
+  e um 📎 quando tem receita.
+- **Registrar aplicação** é um formulário de uma coluna, pensado pro celular: talhão, produto (com a
+  carência no nome), data (hoje, por padrão), dose por hectare, quem aplicou (o nome de quem está
+  logado, por padrão), observação e a foto ou PDF da receita.
+- O detalhe mostra dose, carência, a data em que libera o talhão, quem aplicou, quem registrou e
+  quando, a observação e a receita (a foto aparece na página; o PDF abre num link).
 
-- Cada filme tem os comentários de todos os usuários, o mais novo primeiro. O nome do autor leva pro
-  perfil dele.
-- Qualquer usuário logado comenta pelo campo embaixo do filme.
-- O botão **Apagar** aparece nos próprios comentários; pra admin, aparece em todos.
+### Plano
 
-### Perfil e avatar
-
-- **/perfil** leva pro próprio perfil; **/perfil/&lt;id&gt;** abre o de qualquer usuário.
-- O perfil mostra a foto (ou a inicial do nome, se não tiver), o nome, o selo ★ Premium quando for
-  o caso, a bio, quantos filmes a pessoa favoritou e a grade com os pôsteres.
-- Só no próprio perfil aparece o formulário **Editar perfil**: bio de até 280 caracteres e foto JPG,
-  PNG ou WebP de até 2 MB. Dá pra salvar só a bio e manter a foto.
-
-### Plano Premium
-
-- **/premium** mostra o preço (R$ 9,90/mês), os benefícios e o botão **Assinar com Stripe**.
-- O botão leva pra página de pagamento do Stripe (em modo de teste); o cartão é digitado lá.
-- Ao voltar, a página avisa que o pagamento foi enviado e que a confirmação chega em alguns
-  segundos. O plano fica ativo quando o Stripe confirma, e aí a página mostra "Sua assinatura está
-  ativa".
-- Quem desiste no Stripe volta com "Pagamento cancelado. Nada foi cobrado."
-- Não há botão de cancelar a assinatura no catálogo: o cancelamento acontece no Stripe, e o catálogo
-  volta a pessoa pro plano gratuito quando o Stripe avisa.
+- **Plano** mostra a tabela Free × Pro e, pro produtor, o botão **Assinar o Pro com Stripe**. O
+  checkout, o webhook e o retorno ("Pagamento enviado", "Pagamento cancelado") funcionam como no
+  plano pago da P1.
 
 ### Log de auditoria (admin)
 
-- O link **Logs** leva pra **/admin/logs**, com os últimos 50 eventos, do mais recente pro mais
-  antigo: horário (UTC), usuário, ação, serviço que registrou, IP e detalhes. `?n=` muda a quantidade
-  (até 500).
-- Entram no log: login (certo e errado), logout, favoritar e desfavoritar, comentar, apagar
-  comentário, moderação, edição de perfil, abertura de checkout, plano ativado/cancelado, webhook
-  recusado e toda tentativa negada por permissão. A lista completa, com quem registra cada uma, está
-  no [README](README.md#log-de-auditoria).
+- **/admin/logs** mostra os últimos 50 eventos (`?n=` vai até 500): quando (horário de Brasília),
+  quem (nome e id), ação, serviço, IP e detalhes. **Só eventos do negócio** esconde login, logout e
+  erros.
 
 ---
 
 ## 2. Arquitetura
 
-### Serviços e conexões
+O diagrama dos serviços e de como eles conversam está no [README](README.md#arquitetura). A stack
+é a mesma da P1; mudou o que roda dentro do app.
 
-```mermaid
-flowchart TB
-    nav["Navegador"]
-    cf["Cloudflare + proxy do lapps.studio<br/>HTTPS"]
-
-    subgraph stack["stack hanks-catalogue"]
-        app["catálogo<br/>Flask + Gunicorn<br/>porta 8212 → 5000"]
-        auth["auth-service<br/>Flask · auth:5001"]
-        log["log-service<br/>Flask · log:5002"]
-        redis[("Redis<br/>stream auditoria")]
-        garage[("Garage · S3<br/>bucket fotos-perfil")]
-    end
-
-    db[("MariaDB da disciplina")]
-    tmdb["TMDB API"]
-    stripe["Stripe"]
-    smtp["Brevo · SMTP"]
-
-    nav -->|"HTTPS"| cf
-    cf --> app
-    nav -.->|"página de pagamento"| stripe
-    app -->|"HTTP: cadastro, login, papel, plano"| auth
-    app -->|"HTTP: eventos"| log
-    auth -->|"HTTP: eventos de login"| log
-    log -->|"XADD / XREVRANGE"| redis
-    app -->|"S3: envia, apaga, URL assinada"| garage
-    app -->|"favoritos, comentários, perfis"| db
-    auth -->|"usuários, tokens de senha"| db
-    auth -->|"e-mail de redefinição"| smtp
-    app -->|"filmes do Tom Hanks"| tmdb
-    app -->|"cria Checkout Session"| stripe
-    stripe -->|"webhook assinado"| cf
-```
-
-| Serviço | O que faz | Porta | Fala com |
-|---|---|---|---|
-| **catálogo** (`app/`) | Único ponto de entrada. Páginas, catálogo, favoritos, comentários, perfil, premium e a consulta do log. | `8212` no host → `5000` | auth, log, Garage, MariaDB, TMDB, Stripe |
-| **auth-service** | Cadastro, login, papel e plano de cada usuário, recuperação de senha. Único que escreve em `usuarios`. | `5001`, só na rede do Docker | MariaDB, log, SMTP |
-| **log-service** | Recebe os eventos de auditoria e devolve os últimos N. Único que fala com o Redis. | `5002`, só na rede do Docker | Redis |
-| **Redis** | Guarda o stream `auditoria`, com `appendonly` e volume próprio. | `6379`, só na rede do Docker | — |
-| **Garage** | Object storage compatível com S3 (no lugar do MinIO) pras fotos de perfil. Bucket privado. | `3900`, só na rede do Docker | — |
-| **MariaDB** | Banco da disciplina, fora da stack. Tabelas do auth e do catálogo no mesmo schema. | — | — |
-| **TMDB**, **Stripe**, **Brevo** | Serviços externos: dados dos filmes, pagamento, e-mail. | — | — |
-
-Algumas decisões que aparecem no desenho:
-
-- **Só o catálogo tem porta publicada.** Auth, log, Redis e Garage só existem na rede padrão do
-  projeto no Docker. Até a foto de perfil chega no navegador pela rota `/fotos` do catálogo, que só
-  repassa a URL assinada pro Garage.
-- **Permissão é perguntada na hora (Padrão A).** Antes de deixar alguém moderar um comentário,
-  abrir o log ou passar do limite de favoritos, o catálogo chama `GET /usuarios/<id>` no auth-service
-  e usa o papel e o plano atuais, não o que ficou na sessão do login.
-- **O log não derruba ninguém.** Catálogo e auth mandam o evento com timeout de 2 segundos e ignoram
-  a falha: com o log-service fora, o evento se perde, mas o usuário não percebe.
-- **Cada tabela tem um dono.** O catálogo nunca lê nem escreve em `usuarios`: quando precisa do nome,
-  papel ou plano de alguém, ou de mudar o plano, pede pro auth-service.
-
-### Exemplo de fluxo: assinatura do Premium
-
-É o fluxo que passa por mais peças, incluindo um SaaS que chama o sistema de volta:
+### Exemplo de fluxo: registrar uma aplicação com receita
 
 ```mermaid
 sequenceDiagram
-    actor U as Usuário
-    participant C as catálogo
+    actor F as Funcionário
+    participant App as app
     participant A as auth-service
-    participant S as Stripe
+    participant DB as MariaDB
+    participant G as Garage
     participant L as log-service
 
-    U->>C: POST /premium/assinar
-    C->>A: GET /usuarios/id (já é premium?)
-    C->>S: cria Checkout Session (client_reference_id = id)
-    C->>L: checkout_premium
-    C-->>U: 303 pra página do Stripe
-    U->>S: digita o cartão de teste
-    S-->>U: volta pra /premium?sucesso=1 (só um aviso)
-    S->>C: POST /stripe/webhook com Stripe-Signature
-    C->>C: confere a assinatura e o horário
-    C->>A: PUT /usuarios/id/plano (premium = true)
-    A->>A: UPDATE usuarios no MariaDB
-    C->>L: premium_ativado
-    C-->>S: 200
+    F->>App: POST /aplicacoes/nova (multipart, com a foto)
+    App->>A: GET /usuarios/id (qual o papel agora?)
+    A-->>App: funcionario
+    App->>App: confere os campos e os primeiros bytes da foto
+    App->>DB: o talhão é de uma propriedade em que ele está (membros)?
+    App->>DB: o produto é da mesma propriedade?
+    App->>G: PUT propriedades/1/receitas/<uuid>.jpg
+    App->>DB: INSERT INTO aplicacoes
+    App->>L: aplicacao_registrada
+    App-->>F: 302 pro detalhe da aplicação
+    F->>App: GET /aplicacoes/id
+    App-->>F: página com a URL assinada da receita (10 minutos)
+    F->>App: GET /arquivos/... (assinatura na query)
+    App->>G: repassa o pedido
+    G-->>F: a foto
 ```
 
-### Deploy
+### SaaS, PaaS e IaaS
 
-```mermaid
-flowchart LR
-    push["git push na main"] --> act["GitHub Actions<br/>testes → imagens → deploy"]
-    act -->|"tags sha-commit e latest"| ghcr["GHCR<br/>app, auth, log, garage"]
-    act -.->|"API do Portainer<br/>barrada pelo Cloudflare"| port["Portainer"]
-    eu["IMAGE_TAG + Pull and redeploy<br/>na mão"] --> port
-    port -->|"pull"| ghcr
-    port --> stack["stack hanks-catalogue"]
-```
+A infraestrutura não mudou na troca de domínio, então a classificação é a mesma da atividade 8, só
+sem a API de dados externa, que saiu:
 
-Nada é buildado no servidor: o compose de produção só puxa as imagens do GHCR com a tag do commit.
-Os detalhes (e por que o último passo ainda é um clique) estão no [README](README.md#cicd).
+| Peça | Camada | Por quê |
+|---|---|---|
+| VM do servidor da disciplina (Ubuntu + Docker) | **IaaS** | É a máquina virtual onde a stack roda. Do sistema operacional pra cima, quem instala e mantém é a disciplina. |
+| Portainer + Docker do servidor | **PaaS** | É onde eu faço o deploy: entrego o `docker-compose.yml` e as imagens, e a plataforma cuida do runtime, da rede, dos volumes e de reiniciar o que cair. |
+| Containers do app, auth-service e log-service | **PaaS** | Meu código empacotado em imagem (GHCR), rodando na plataforma acima. |
+| Redis e Garage (no lugar do MinIO) | **PaaS** | Containers da stack, na mesma plataforma, com configuração minha (persistência, bucket, chaves). |
+| MariaDB da disciplina | **PaaS** | Banco entregue pronto: recebo host, usuário e um schema. |
+| Stripe | **SaaS** | Checkout e assinatura prontos; o cartão não passa pelo sistema. |
+| Brevo (produção) / Mailtrap (dev) | **SaaS** | E-mail transacional por SMTP. |
+| Cloudflare | **SaaS** | HTTPS e proxy na frente do `lapps.studio`. |
+| GitHub (repositório, issues, Actions) e GHCR | **SaaS** | Pipeline descrito num YAML e rodado nas máquinas do GitHub; o GHCR guarda as imagens. |
+
+E o próprio Talhão em Dia é um **SaaS** do ponto de vista do produtor: ele não instala nada, usa
+pelo navegador do celular e paga por mês.
 
 ---
 
@@ -209,251 +151,274 @@ Os detalhes (e por que o último passo ainda é um clique) estão no [README](RE
 
 Tiradas lendo o código, no formato "se X, então Y". O link de cada uma vai pra linha onde ela está.
 
-### Cadastro e login
+### Cadastro, login e papéis
 
-1. **Se** nome, e-mail ou senha vierem vazios, **então** o cadastro é recusado ("Preencha todos os
-   campos."). — [`app/auth.py:48`](app/auth.py#L48), [`auth-service/app.py:142`](auth-service/app.py#L142)
-2. **Se** o e-mail já tiver conta, **então** o cadastro é recusado com `409`. O e-mail é comparado
-   sem espaços nas pontas e em minúsculas, então `Joao@Email.com ` e `joao@email.com` são a mesma
-   conta. — [`auth-service/app.py:139`](auth-service/app.py#L139), [`:152`](auth-service/app.py#L152)
-3. **Se** a conta é criada pelo cadastro, **então** o papel é sempre `usuario`, não importa o que
-   venha na requisição. — [`auth-service/app.py:155-156`](auth-service/app.py#L155-L156)
-4. **Se** uma senha é cadastrada ou trocada, **então** só o hash dela vai pro banco. —
-   [`auth-service/app.py:145`](auth-service/app.py#L145), [`:487`](auth-service/app.py#L487)
-5. **Se** o e-mail não existe ou a senha não bate, **então** o login falha com a mesma mensagem nos
-   dois casos e o evento `login_falhou` é registrado (com o id da conta, quando o e-mail existe). —
-   [`auth-service/app.py:220-227`](auth-service/app.py#L220-L227)
+1. **Se** alguém se cadastra pela página aberta, **então** só pode escolher produtor ou agrônomo;
+   qualquer outro papel no formulário dá `400`. — [`app/auth.py:13`](app/auth.py#L13),
+   [`:99`](app/auth.py#L99)
+2. **Se** o pedido de cadastro chega no auth-service com `admin` (ou qualquer papel fora de
+   produtor, funcionário e agrônomo), **então** é recusado com `400`: admin nunca nasce pelo
+   cadastro. — [`auth-service/app.py:46`](auth-service/app.py#L46), [`:160`](auth-service/app.py#L160)
+3. **Se** o e-mail já tem conta, **então** o cadastro dá `409`; o e-mail é comparado sem espaços e
+   em minúsculas. — [`auth-service/app.py:170`](auth-service/app.py#L170)
+4. **Se** uma senha é cadastrada ou trocada, **então** só o hash vai pro banco. —
+   [`auth-service/app.py:163`](auth-service/app.py#L163), [`:548`](auth-service/app.py#L548)
+5. **Se** o e-mail não existe ou a senha não bate, **então** o login falha com a mesma mensagem e
+   vira `login_falhou` no log. — [`auth-service/app.py:239-240`](auth-service/app.py#L239-L240)
 6. **Se** o login dá certo, **então** a sessão anterior é apagada e a nova guarda só id, nome e
-   papel. — [`app/auth.py:89-92`](app/auth.py#L89-L92)
-7. **Se** alguém sem sessão abre o catálogo, um perfil, o premium ou o log, **então** é mandado pro
-   `/login`. — [`app/auth.py:29-36`](app/auth.py#L29-L36)
+   papel; o papel da sessão serve só pra montar o menu. — [`app/auth.py:135-138`](app/auth.py#L135-L138)
+7. **Se** o login veio de um link de convite, **então** volta pra ele depois de entrar, mas só se o
+   destino for um caminho do próprio site. — [`app/auth.py:141`](app/auth.py#L141)
+8. **Se** a requisição precisa saber o papel, **então** ele é perguntado ao auth-service naquela
+   hora (Padrão A); se o auth-service não responde, a resposta é `503`. —
+   [`app/acesso.py:24-31`](app/acesso.py#L24-L31)
+9. **Se** o papel não tem a permissão da ação, **então** a resposta é `403` antes de olhar qualquer
+   registro, mesmo que o id exista. — [`app/acesso.py:9`](app/acesso.py#L9),
+   [`:46-51`](app/acesso.py#L46-L51)
+10. **Se** a API é chamada sem login, **então** responde `401` em JSON (as telas mandam pro
+    `/login`). — [`app/auth.py:72`](app/auth.py#L72)
 
-### Recuperação de senha
+### Propriedade e convites
 
-8. **Se** alguém pede a recuperação, **então** a resposta é a mesma exista ou não a conta, pra não
-   revelar quais e-mails estão cadastrados. — [`app/auth.py:121-125`](app/auth.py#L121-L125),
-   [`auth-service/app.py:413-419`](auth-service/app.py#L413-L419)
-9. **Se** o e-mail tem conta, **então** é gerado um token aleatório que vale 30 minutos e o link vai
-   por e-mail. — [`auth-service/app.py:43`](auth-service/app.py#L43), [`:402-410`](auth-service/app.py#L402-L410)
-10. **Se** o token não existe, já foi usado ou passou dos 30 minutos, **então** a troca de senha é
-    recusada, com uma mensagem pra cada caso. — [`auth-service/app.py:480-485`](auth-service/app.py#L480-L485)
-11. **Se** a senha é trocada pelo link, **então** o token é marcado como usado na mesma hora. —
-    [`auth-service/app.py:487-494`](auth-service/app.py#L487-L494)
+11. **Se** quem tenta cadastrar uma propriedade não é produtor, **então** `403`; **se** o produtor
+    já tem uma, **então** volta pros talhões (uma propriedade por produtor, por enquanto). —
+    [`app/propriedade.py:25-29`](app/propriedade.py#L25-L29)
+12. **Se** a propriedade é criada, **então** o dono entra junto como membro dela. —
+    [`app/propriedade.py:49`](app/propriedade.py#L49)
+13. **Se** o produtor gera um convite, **então** o link tem um token aleatório, vale 7 dias e só pode
+    ser de funcionário ou agrônomo. — [`app/propriedade.py:14`](app/propriedade.py#L14),
+    [`:120-122`](app/propriedade.py#L120-L122)
+14. **Se** o convite não existe, já foi usado ou venceu, **então** a página dá `404`. —
+    [`app/propriedade.py:155`](app/propriedade.py#L155)
+15. **Se** alguém sem login aceita o convite, **então** a conta é criada com o papel do convite e já
+    entra na propriedade; o convite fica marcado com quem usou. —
+    [`app/propriedade.py:200`](app/propriedade.py#L200), [`:160-166`](app/propriedade.py#L160-L166)
+16. **Se** quem abre o convite já está logado, **então** só aceita se o convite for de agrônomo e a
+    conta também; qualquer outra combinação só mostra o aviso. —
+    [`app/propriedade.py:185`](app/propriedade.py#L185)
 
-### Catálogo
+### Isolamento por propriedade
 
-12. **Se** um filme da TMDB não tem pôster, **então** ele não aparece no catálogo. —
-    [`app/tmdb.py:37`](app/tmdb.py#L37)
-13. **Se** a página pedida (`?page=`) é menor que 1 ou maior que a última, **então** o catálogo mostra
-    a primeira ou a última. — [`app/movies.py:38-40`](app/movies.py#L38-L40)
+17. **Se** um talhão, produto ou aplicação é de uma propriedade de que o usuário não faz parte,
+    **então** ele não aparece em lista nenhuma e, aberto pelo id (tela ou API), dá `404`, igual a
+    um id que não existe. Toda consulta passa pela tabela `membros`. —
+    [`app/caderno.py:179`](app/caderno.py#L179), [`:494-514`](app/caderno.py#L494-L514)
+18. **Se** alguém registra uma aplicação com o id de um talhão de outra propriedade, **então** é
+    recusado com a mesma mensagem de um talhão que não existe. —
+    [`app/caderno.py:506`](app/caderno.py#L506)
+19. **Se** o produto escolhido não é da mesma propriedade do talhão, **então** a aplicação é
+    recusada. — [`app/caderno.py:514`](app/caderno.py#L514)
+20. **Se** uma aplicação é editada pra um talhão de outra propriedade, **então** é recusada. —
+    [`app/caderno.py:568`](app/caderno.py#L568)
 
-### Favoritos e plano
+### Talhões e produtos
 
-14. **Se** o filme já está nos favoritos, **então** clicar de novo tira ele; desfavoritar é sempre
-    liberado, em qualquer plano. — [`app/movies.py:101-106`](app/movies.py#L101-L106)
-15. **Se** o usuário já tem 5 favoritos e não é premium, **então** favoritar um filme novo dá `403`,
-    mesmo chamando a rota direto (o botão desabilitado é só aparência). —
-    [`app/movies.py:14`](app/movies.py#L14), [`:116-117`](app/movies.py#L116-L117)
-16. **Se** o usuário é premium, **então** não há limite de favoritos. —
-    [`app/movies.py:116`](app/movies.py#L116)
-17. **Se** o usuário acabou de assinar ou cancelar, **então** a mudança vale na hora, sem relogar: o
-    plano é perguntado ao auth-service a cada vez, não lido da sessão. —
-    [`app/movies.py:24-29`](app/movies.py#L24-L29)
-18. **Se** o auth-service não responde na hora de conferir o plano, **então** vale o plano gratuito.
-    — [`app/movies.py:28-29`](app/movies.py#L28-L29)
-19. **Se** a assinatura é cancelada, **então** os favoritos que já existem ficam, mas um novo só entra
-    quando o total cair abaixo de 5. — [`app/movies.py:116`](app/movies.py#L116),
-    [`app/premium.py:126-135`](app/premium.py#L126-L135)
+21. **Se** quem tenta cadastrar, editar ou apagar talhão ou produto não é o produtor dono da
+    propriedade, **então** `403`. — [`app/caderno.py:235`](app/caderno.py#L235),
+    [`:264`](app/caderno.py#L264), [`:289`](app/caderno.py#L289)
+22. **Se** já existe um talhão (ou produto) com o mesmo nome na propriedade, **então** `409`. —
+    [`app/caderno.py:252`](app/caderno.py#L252), [`db/001_dominio.sql:58`](db/001_dominio.sql#L58)
+23. **Se** o talhão tem aplicações, **então** não pode ser apagado (`409`): o histórico do caderno
+    não some junto. — [`app/caderno.py:295`](app/caderno.py#L295)
+24. **Se** o produto já foi aplicado, **então** também não pode ser apagado. —
+    [`app/caderno.py:415`](app/caderno.py#L415)
+25. **Se** a área ou a dose não é um número maior que zero, **então** é recusada; vírgula vale como
+    separador decimal. — [`app/caderno.py:58`](app/caderno.py#L58)
+26. **Se** a carência não está entre 0 e 365 dias, ou a unidade não é L ou kg, **então** o produto é
+    recusado. — [`app/caderno.py:94`](app/caderno.py#L94)
 
-### Comentários
+### Aplicações e carência
 
-20. **Se** o comentário está vazio (ou só tem espaços), **então** nada é gravado. —
-    [`app/movies.py:142`](app/movies.py#L142)
-21. **Se** quem pede pra apagar é o autor, **então** o comentário é apagado e vai pro log como
-    `apagar_comentario`. — [`app/movies.py:181`](app/movies.py#L181), [`:189-190`](app/movies.py#L189-L190)
-22. **Se** quem pede não é o autor, **então** só apaga se o auth-service disser, naquele momento, que
-    a pessoa é admin; senão `403`. Apagado por admin vai pro log como `moderar_comentario`, com o id
-    do autor. — [`app/movies.py:182-183`](app/movies.py#L182-L183), [`:191-195`](app/movies.py#L191-L195)
-23. **Se** o auth-service não responde nessa checagem, **então** a pessoa é tratada como não-admin. —
-    [`app/movies.py:17-21`](app/movies.py#L17-L21), [`app/auth.py:19-26`](app/auth.py#L19-L26)
-24. **Se** o comentário não existe, **então** a resposta é `404`. —
-    [`app/movies.py:174-175`](app/movies.py#L174-L175)
+27. **Se** quem tenta registrar é agrônomo ou admin, **então** `403`. —
+    [`app/acesso.py:9`](app/acesso.py#L9), [`app/caderno.py:526`](app/caderno.py#L526)
+28. **Se** a data da aplicação é depois de hoje (no dia de Brasília), **então** é recusada. —
+    [`app/caderno.py:76`](app/caderno.py#L76), [`:36`](app/caderno.py#L36)
+29. **Se** quem edita ou apaga é funcionário, **então** só passa nas aplicações que ele mesmo
+    registrou; o produtor passa em todas da propriedade dele. —
+    [`app/caderno.py:474`](app/caderno.py#L474), [`:484`](app/caderno.py#L484)
+30. **Se** o talhão tem aplicações, **então** ele fica liberado no dia em que vence a carência mais
+    longa entre elas (data da aplicação + carência do produto); antes disso, aparece em carência com
+    os dias que faltam. — [`app/caderno.py:176`](app/caderno.py#L176),
+    [`:185`](app/caderno.py#L185)
+31. **Se** a carência de um produto é corrigida, **então** a data de liberação dos talhões em que ele
+    já foi aplicado muda junto, porque ela é calculada na hora e não gravada. —
+    [`app/caderno.py:176`](app/caderno.py#L176)
 
-### Perfil e avatar
+### Receita (upload)
 
-25. **Se** o usuário está logado, **então** vê o perfil de qualquer outro. —
-    [`app/perfil.py:102-105`](app/perfil.py#L102-L105)
-26. **Se** o id do perfil na URL é diferente do usuário da sessão, **então** a edição é negada com
-    `403`, inclusive pra admin. O id da URL só é conferido, nunca decide de quem é o perfil salvo. —
-    [`app/perfil.py:113-114`](app/perfil.py#L113-L114)
-27. **Se** a bio passa de 280 caracteres, **então** nada é salvo. — [`app/perfil.py:117`](app/perfil.py#L117)
-28. **Se** a foto passa de 2 MB, **então** é recusada; **se** a requisição inteira passa de 5 MB,
-    **então** o Flask corta antes de chegar na rota (`413`). — [`app/perfil.py:126`](app/perfil.py#L126),
-    [`app/__init__.py:15`](app/__init__.py#L15)
-29. **Se** os primeiros bytes do arquivo não são de JPG, PNG ou WebP, **então** a foto é recusada; a
+32. **Se** o arquivo passa de 8 MB, **então** é recusado; **se** a requisição inteira passa de 10 MB,
+    o Flask corta antes de chegar na rota (`413`). — [`app/caderno.py:138`](app/caderno.py#L138),
+    [`app/__init__.py:27`](app/__init__.py#L27)
+33. **Se** os primeiros bytes não são de JPG, PNG, WebP ou PDF, **então** a receita é recusada; a
     extensão e o `Content-Type` mandados pelo navegador não contam. —
-    [`app/perfil.py:20-29`](app/perfil.py#L20-L29), [`:133-137`](app/perfil.py#L133-L137)
-30. **Se** uma foto nova é enviada, **então** ela ganha uma chave nova (`perfis/<id>/<uuid>.<ext>`) e
-    a antiga só é apagada do Garage depois que o banco já aponta pra nova. —
-    [`app/perfil.py:140`](app/perfil.py#L140), [`:164-168`](app/perfil.py#L164-L168)
-31. **Se** o usuário salva só a bio, **então** a foto atual continua. —
-    [`app/perfil.py:155-159`](app/perfil.py#L155-L159)
-32. **Se** o Garage falha ao receber a foto, **então** nada muda no banco e a resposta é `503`. —
-    [`app/perfil.py:141-146`](app/perfil.py#L141-L146)
-33. **Se** alguém abre um perfil com foto, **então** recebe uma URL assinada que vale 10 minutos;
-    vencida ou adulterada, o Garage responde `403`. — [`app/storage.py:6`](app/storage.py#L6),
-    [`:46-54`](app/storage.py#L46-L54), [`app/perfil.py:186-199`](app/perfil.py#L186-L199)
+    [`app/caderno.py:124`](app/caderno.py#L124)
+34. **Se** a receita é aceita, **então** vai pro Garage com a chave
+    `propriedades/<propriedade>/receitas/<uuid>.<ext>` e o banco guarda só a chave. —
+    [`app/caderno.py:154`](app/caderno.py#L154)
+35. **Se** a aplicação é editada sem arquivo novo, **então** a receita atual continua; com arquivo
+    novo, a antiga só sai do Garage depois que o banco já aponta pra nova. —
+    [`app/caderno.py:575`](app/caderno.py#L575), [`:591-592`](app/caderno.py#L591-L592)
+36. **Se** a aplicação é apagada, **então** a receita sai do Garage junto. —
+    [`app/caderno.py:625`](app/caderno.py#L625)
+37. **Se** alguém abre a receita, **então** recebe uma URL assinada que vale 10 minutos; vencida ou
+    adulterada, o Garage responde `403`. — [`app/storage.py:6`](app/storage.py#L6),
+    [`app/arquivos.py:22`](app/arquivos.py#L22)
 
-### Plano Premium (Stripe)
+### Plano (Stripe)
 
-34. **Se** o usuário já é premium, **então** "Assinar" não abre outro checkout. —
-    [`app/premium.py:64-65`](app/premium.py#L64-L65)
-35. **Se** o usuário volta do Stripe pra `/premium?sucesso=1`, **então** só aparece um aviso: essa URL
-    não ativa nada, qualquer um pode abri-la na mão. — [`app/premium.py:27`](app/premium.py#L27)
-36. **Se** o webhook chega sem `Stripe-Signature` válida, ou com horário de mais de 5 minutos,
+38. **Se** quem tenta assinar não é produtor, **então** `403`; **se** já é Pro, não abre outro
+    checkout. — [`app/plano.py:62-63`](app/plano.py#L62-L63)
+39. **Se** o webhook chega sem `Stripe-Signature` válida ou com horário de mais de 5 minutos,
     **então** é recusado com `400` e vai pro log como `webhook_recusado`. —
-    [`app/premium.py:96-105`](app/premium.py#L96-L105)
-37. **Se** chega `checkout.session.completed` com `payment_status = paid`, **então** o usuário do
-    `client_reference_id` vira premium e o banco guarda os IDs do cliente e da assinatura no Stripe. —
-    [`app/premium.py:113-124`](app/premium.py#L113-L124), [`auth-service/app.py:349-353`](auth-service/app.py#L349-L353)
-38. **Se** chega `customer.subscription.deleted`, **então** o usuário dos `metadata` da assinatura
-    volta pro gratuito; o id da assinatura é apagado e o do cliente fica. —
-    [`app/premium.py:126-135`](app/premium.py#L126-L135), [`auth-service/app.py:339`](auth-service/app.py#L339)
-39. **Se** o auth-service não consegue gravar o plano, **então** o webhook responde `503` e o Stripe
-    manda o mesmo evento de novo depois; gravar o mesmo plano duas vezes não muda nada. —
-    [`app/premium.py:116-119`](app/premium.py#L116-L119)
+    [`app/plano.py:96-100`](app/plano.py#L96-L100)
+40. **Se** o auth-service não consegue gravar o plano, **então** o webhook responde `503` e o Stripe
+    manda o mesmo evento depois. — [`app/plano.py:115-118`](app/plano.py#L115-L118)
 
 ### Auditoria
 
-40. **Se** qualquer rota do catálogo responde `403`, **então** o evento `acesso_negado` é registrado
-    com o método e o caminho. — [`app/__init__.py:42-45`](app/__init__.py#L42-L45)
-41. **Se** o log-service está fora do ar, **então** a ação do usuário segue normalmente e o evento se
-    perde. — [`app/auditoria.py:19-34`](app/auditoria.py#L19-L34), [`auth-service/auditoria.py`](auth-service/auditoria.py)
-42. **Se** um evento chega sem `acao`, **então** o log-service recusa com `400`. —
-    [`log-service/app.py:144`](log-service/app.py#L144)
-43. **Se** um serviço manda um evento, **então** o horário gravado é o do log-service na chegada (UTC),
-    não o de quem mandou, pra todos ficarem na mesma linha do tempo. —
-    [`log-service/app.py:152`](log-service/app.py#L152)
-44. **Se** quem abre `/admin/logs` não é admin (perguntado ao auth-service na hora), **então** `403`.
-    — [`app/movies.py:203-204`](app/movies.py#L203-L204)
-45. **Se** `?n=` vem fora de 1 a 500, **então** é ajustado pro limite mais próximo; sem `n`, são 50. —
-    [`app/movies.py:206`](app/movies.py#L206), [`log-service/app.py:185`](log-service/app.py#L185)
-46. **Se** a requisição passou pelo proxy do servidor, **então** o IP registrado é o primeiro do
-    `X-Forwarded-For`. — [`app/auditoria.py:7-12`](app/auditoria.py#L7-L12)
+41. **Se** qualquer rota responde `403`, da tela ou da API, **então** vira `acesso_negado` no log com
+    o método e o caminho. — [`app/__init__.py:83-85`](app/__init__.py#L83-L85)
+42. **Se** um registro do caderno é criado, editado ou apagado, **então** vira um evento de negócio
+    no log; a edição leva o antes e o depois de cada campo que mudou. —
+    [`app/caderno.py:631`](app/caderno.py#L631)
+43. **Se** quem abre `/admin/logs` não é admin, **então** `403`. — [`app/admin.py:44`](app/admin.py#L44)
+44. **Se** o log-service está fora do ar, **então** a ação do usuário segue normalmente e o evento se
+    perde. — [`app/auditoria.py:33`](app/auditoria.py#L33)
 
 ### O que a leitura do código mostrou fora das regras
 
-Coisas que nenhuma regra acima cobre e que só apareceram lendo o código com calma:
-
-- **Pedir outro link de senha não invalida os anteriores.** Cada pedido só insere um token novo;
-  os antigos continuam valendo até completar os 30 minutos deles.
-- **Trocar a senha não encerra sessões abertas.** A sessão é um cookie assinado do Flask, sem
-  registro no servidor, então quem já estava logado continua logado.
-- **A tela usa o papel da sessão; o backend, não.** O botão "Apagar" e o link "Logs" aparecem conforme
-  o `role` gravado no login ([`app/movies.py:64`](app/movies.py#L64)), enquanto a decisão de verdade
-  pergunta ao auth-service. Se o papel de alguém mudar, a tela fica desatualizada até a pessoa
-  relogar, mas o que ela consegue fazer já muda na hora.
-- **O limite de favoritos não está numa transação.** A contagem e o `INSERT` são comandos separados;
-  duas requisições exatamente ao mesmo tempo com 4 favoritos poderiam passar as duas.
+- **O menu usa o papel da sessão; o backend, não.** Se o papel de alguém mudar no banco, o menu fica
+  desatualizado até a pessoa relogar, mas o que ela consegue fazer já muda na hora.
+- **Não dá pra tirar alguém da equipe pela tela.** O convite só adiciona; remover um funcionário
+  hoje é direto no banco.
+- **O plano ainda é do usuário, não da propriedade.** O checkout e o webhook vieram da P1 do jeito
+  que eram; a troca pra propriedade e o limite de 2 talhões no Free são a atividade 11.
 
 ---
 
 ## 4. Modelo de dados
 
 O sistema guarda dados em três lugares: o **MariaDB** (tabelas), o **Redis** (log de auditoria) e o
-**Garage** (fotos). Os filmes e os pagamentos ficam fora, na TMDB e no Stripe.
+**Garage** (receitas). Os pagamentos ficam no Stripe.
 
 ### Tabelas no MariaDB
+
+Criadas por [`db/000_contas.sql`](db/000_contas.sql) e [`db/001_dominio.sql`](db/001_dominio.sql).
 
 ```mermaid
 erDiagram
     usuarios ||--o{ reset_tokens : "pede"
-    usuarios ||--o{ favoritos : "favorita"
-    usuarios ||--o{ comentarios : "escreve"
-    usuarios ||--o| perfis : "tem"
+    usuarios ||--o{ propriedades : "é dono"
+    usuarios ||--o{ membros : "participa"
+    propriedades ||--o{ membros : "tem"
+    propriedades ||--o{ convites : "gera"
+    propriedades ||--o{ talhoes : "tem"
+    propriedades ||--o{ produtos : "usa"
+    talhoes ||--o{ aplicacoes : "recebe"
+    produtos ||--o{ aplicacoes : "aplicado em"
+    usuarios ||--o{ aplicacoes : "registra"
 
     usuarios {
         int id PK
         varchar nome
         varchar email UK
         varchar senha_hash
-        varchar role "usuario ou admin"
+        varchar role "produtor, funcionario, agronomo ou admin"
         boolean premium
         varchar stripe_customer_id
         varchar stripe_subscription_id
+    }
+    propriedades {
+        int id PK
+        int dono_id FK
+        varchar nome
+        varchar municipio
+    }
+    membros {
+        int propriedade_id PK, FK
+        int usuario_id PK, FK
+        timestamp entrou_em
+    }
+    convites {
+        varchar token PK
+        int propriedade_id FK
+        varchar papel "funcionario ou agronomo"
+        int criado_por FK
+        datetime expira_em
+        int usado_por FK
+        datetime usado_em
+    }
+    talhoes {
+        int id PK
+        int propriedade_id FK
+        varchar nome "único na propriedade"
+        decimal area_ha
+        varchar cultura
+    }
+    produtos {
+        int id PK
+        int propriedade_id FK
+        varchar nome "único na propriedade"
+        int carencia_dias
+        varchar unidade "L ou kg"
+    }
+    aplicacoes {
+        int id PK
+        int talhao_id FK
+        int produto_id FK
+        date data_aplicacao
+        decimal dose "por hectare"
+        varchar aplicador "quem aplicou de fato"
+        varchar observacao
+        varchar receita_key "chave no Garage"
+        int registrado_por FK
         timestamp criado_em
+        timestamp atualizado_em
     }
     reset_tokens {
         varchar token PK
         int usuario_id FK
-        timestamp criado_em
         timestamp expira_em
         boolean usado
-    }
-    favoritos {
-        int id PK
-        int usuario_id FK
-        int tmdb_movie_id "id do filme na TMDB"
-        varchar titulo
-        varchar poster_path
-        timestamp criado_em
-    }
-    comentarios {
-        int id PK
-        int usuario_id FK
-        varchar nome_usuario
-        int tmdb_movie_id "id do filme na TMDB"
-        text texto
-        timestamp criado_em
-    }
-    perfis {
-        int usuario_id PK, FK
-        varchar bio "até 280 caracteres"
-        varchar foto_key "chave do objeto no Garage"
-        timestamp atualizado_em
     }
 ```
 
 | Tabela | Dono | Observações |
 |---|---|---|
-| `usuarios` | auth-service | `email` único. `role` e `premium` ficam lado a lado: papel e plano são atributos do usuário. Do Stripe, só os IDs do cliente e da assinatura. |
-| `reset_tokens` | auth-service | Um usuário pode ter vários tokens; cada um tem a própria validade e o `usado`. |
-| `favoritos` | catálogo | `UNIQUE (usuario_id, tmdb_movie_id)`: o mesmo filme não entra duas vezes pra mesma pessoa. Guarda uma cópia do título e do pôster pra montar o perfil sem chamar a TMDB. |
-| `comentarios` | catálogo | `nome_usuario` é copiado da sessão na hora do comentário, então a lista de comentários sai sem consultar o auth-service. |
-| `perfis` | catálogo | Um por usuário, no máximo (a chave primária é o próprio `usuario_id`). A linha só nasce na primeira vez que a pessoa salva o perfil. |
+| `usuarios`, `reset_tokens` | auth-service | O app nunca lê nem escreve aqui: nome, papel e plano vêm pela API do auth-service. |
+| `propriedades` | app | O "cliente" do SaaS. `dono_id` é o produtor que criou. |
+| `membros` | app | Quem faz parte de cada propriedade, inclusive o dono. É por ela que passa todo o isolamento. |
+| `convites` | app | Uso único: depois de aceito, `usado_por` e `usado_em` ficam preenchidos. |
+| `talhoes`, `produtos` | app | `UNIQUE (propriedade_id, nome)`. Não têm `ON DELETE CASCADE`: com aplicação ligada, não apagam. |
+| `aplicacoes` | app | `aplicador` é texto porque quem aplicou pode ser um diarista sem conta; `registrado_por` é sempre um usuário. A data de liberação não é gravada: é `data_aplicacao + carencia_dias`, calculada na consulta. |
 
-As tabelas dos dois serviços estão no mesmo schema (o banco da disciplina é um só por aluno), por
-isso as chaves estrangeiras atravessam de um serviço pro outro. A separação é por quem escreve: o
-catálogo nunca toca em `usuarios` nem em `reset_tokens`.
-
-### As entidades do enunciado
-
-| Entidade | Onde fica | Por quê |
-|---|---|---|
-| Usuário | tabela `usuarios` | — |
-| Filme | **não tem tabela.** Vem da API do TMDB a cada acesso; `favoritos` e `comentarios` guardam só o `tmdb_movie_id`. | Título, sinopse e pôster nunca ficam desatualizados, e não existe acervo pra manter. |
-| Favorito | tabela `favoritos` | — |
-| Log | Redis Stream `auditoria` | Só se acrescenta, nunca se altera; o próprio Redis gera um ID por evento a partir do horário, então a ordem vem de graça. |
-| Sessão premium | **não tem tabela.** A Checkout Session e a assinatura existem no Stripe; aqui ficam `premium`, `stripe_customer_id` e `stripe_subscription_id` em `usuarios`. | O que o resto do sistema precisa saber é só se o usuário é premium agora. O histórico de pagamentos já está no Stripe. |
+As tabelas do catálogo da P1 (`favoritos`, `comentarios`, `perfis`) foram apagadas pela
+`001_dominio.sql`; o histórico delas continua no git.
 
 ### Log de auditoria (Redis)
 
-Cada evento é uma entrada do stream `auditoria`:
+Cada evento é uma entrada do stream `auditoria`, com `usuario_id`, `acao`, `timestamp` (relógio do
+log-service, em UTC), `ip`, `servico` (`app` ou `auth`) e `detalhes`. Os eventos do negócio:
 
-| Campo | Exemplo | De onde vem |
+| Ação | Quando | Exemplo de detalhes |
 |---|---|---|
-| id | `1759268412345-0` | gerado pelo Redis no `XADD` |
-| `usuario_id` | `6` | sessão do catálogo, ou o auth-service no login |
-| `acao` | `favoritar` | obrigatório |
-| `timestamp` | `2026-09-30T21:40:12+00:00` | relógio do log-service, em UTC |
-| `ip` | `177.10.20.30` | primeiro IP do `X-Forwarded-For` |
-| `servico` | `catalogo` ou `auth` | quem mandou |
-| `detalhes` | `filme 13 (Forrest Gump)` | texto livre |
+| `conta_criada` | cadastro pela página aberta | `produtor` |
+| `propriedade_criada` | produtor cadastra o sítio | `propriedade Sítio Boa Vista (1), Garça` |
+| `convite_criado` / `convite_aceito` | link gerado / conta criada ou agrônomo aceitou | `funcionario na propriedade Sítio Boa Vista (1)` |
+| `talhao_criado` / `talhao_editado` / `talhao_apagado` | CRUD de talhão | `talhão Alto (2): área 5,00 → 5,50` |
+| `produto_cadastrado` / `produto_editado` / `produto_apagado` | CRUD de produto | `produto Fungicida cúprico (1), carência de 7 dias` |
+| `aplicacao_registrada` | aplicação nova | `aplicação 6: Herbicida pós-emergente, 1,50 L/ha no talhão Divisa (4) em 27/10/2026, aplicado por Diego, com receita` |
+| `aplicacao_editada` | edição | `aplicação 6: dose 1,50 → 2,00` |
+| `aplicacao_apagada` | aplicação apagada | o mesmo resumo da registrada |
+| `checkout_pro` / `pro_ativado` / `pro_cancelado` | assinatura | id da sessão ou da assinatura no Stripe |
 
-### Fotos de perfil (Garage)
+Fora do negócio continuam `login`, `login_falhou`, `logout`, `acesso_negado` e `webhook_recusado`.
 
-Bucket privado `fotos-perfil`, um objeto por foto, com chave `perfis/<usuario_id>/<uuid>.<ext>`. A
-coluna `perfis.foto_key` aponta pro objeto atual; o anterior é apagado na troca.
+### Receitas (Garage)
+
+Bucket privado, um objeto por receita, com chave `propriedades/<propriedade_id>/receitas/<uuid>.<ext>`.
+A coluna `aplicacoes.receita_key` aponta pro objeto atual. Pra ver o que está guardado:
+`flask --app run arquivos` dentro do container do app.
 
 ### Sessão de login
 

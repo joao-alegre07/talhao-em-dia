@@ -17,12 +17,12 @@ def test_evento_sem_acao_da_400(client):
 
 
 def test_eventos_voltam_do_mais_recente_pro_mais_antigo(client):
-    for acao in ["login", "favoritar", "logout"]:
+    for acao in ["login", "aplicacao_registrada", "logout"]:
         assert client.post("/eventos", json={"acao": acao, "usuario_id": 3}).status_code == 201
 
     eventos = client.get("/eventos").get_json()
 
-    assert [e["acao"] for e in eventos] == ["logout", "favoritar", "login"]
+    assert [e["acao"] for e in eventos] == ["logout", "aplicacao_registrada", "login"]
     assert all(e["timestamp"] for e in eventos)
 
 

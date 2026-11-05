@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}Editar produto · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<form class="form caixa" method="post">
+  <h1>Editar {{ produto.nome }}</h1>
+  <p class="dica">Mudar a carência muda também a data de liberação dos talhões em que o produto já foi aplicado.</p>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  {% include "_produto_campos.html" %}
+  <button type="submit">Salvar</button>
+  <a href="{{ url_for('telas.produtos') }}">Cancelar</a>
+</form>
+{% endblock %}

@@ -1,0 +1,28 @@
+<div class="tabela-wrap">
+  <table class="tabela">
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Talhão</th>
+        <th>Produto</th>
+        <th>Dose</th>
+        <th>Aplicado por</th>
+        <th>Carência até</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in aplicacoes %}
+      <tr>
+        <td><a href="{{ url_for('telas.aplicacao', aplicacao_id=a.id) }}">{{ a.data_aplicacao | data }}</a></td>
+        <td>{{ a.talhao }}</td>
+        <td>{{ a.produto }}</td>
+        <td>{{ a.dose | num }} {{ a.unidade }}/ha</td>
+        <td>{{ a.aplicador }}</td>
+        <td class="{{ 'texto-carencia' if a.libera_em > hoje else '' }}">{{ a.libera_em | data }}</td>
+        <td>{% if a.receita_key %}<span title="Tem receita anexada">📎</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block titulo %}{{ talhao.nome }} · Talhão em Dia{% endblock %}
+{% block conteudo %}
+<p class="trilha"><a href="{{ url_for('telas.talhoes') }}">Talhões</a> › {{ talhao.propriedade }}</p>
+<div class="cabecalho">
+  <div>
+    <h1>{{ talhao.nome }}</h1>
+    <p class="sub">{{ talhao.area_ha | num }} ha · {{ talhao.cultura }}</p>
+  </div>
+  <div class="acoes">
+    {% if pode_registrar %}<a class="botao" href="{{ url_for('telas.nova_aplicacao', talhao_id=talhao.id) }}">+ Registrar aplicação</a>{% endif %}
+    {% if pode_editar %}
+    <a class="botao botao-claro" href="{{ url_for('telas.editar_talhao', talhao_id=talhao.id) }}">Editar</a>
+    <form method="post" action="{{ url_for('telas.apagar_talhao', talhao_id=talhao.id) }}" onsubmit="return confirm('Apagar o talhão {{ talhao.nome }}?')">
+      <button class="botao botao-perigo" type="submit">Apagar</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="destaque">
+  {% set t = talhao %}
+  {% include "_carencia.html" %}
+</div>
+
+<h2>Aplicações neste talhão</h2>
+{% if aplicacoes %}
+  {% include "_aplicacoes.html" %}
+{% else %}
+  <p class="vazio">Nenhuma aplicação registrada neste talhão.</p>
+{% endif %}
+{% endblock %}

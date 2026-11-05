@@ -2,12 +2,238 @@
 
 **Caderno de campo no celular pro pequeno produtor de café: cada aplicação registrada por talhão, aviso de quando a carência acaba e o histórico pronto quando a cooperativa ou a certificadora pedir.**
 
-Este repositório continua o [Hanks-catalogue](https://github.com/joao-alegre07/Hanks-catalogue), o
-catálogo de filmes do Tom Hanks, com todo o histórico. A arquitetura é a mesma (login, papéis, logs,
-upload e pagamento); o que muda é o negócio. Por enquanto o código ainda é o do catálogo, e a troca
-começa na atividade 10 (ver [Backlog](#backlog) e [Estado do código](#estado-do-código)).
+**No ar:** [joao-alegre-isw055.lapps.studio](https://joao-alegre-isw055.lapps.studio/)
 
-## A dor
+Este repositório continua o [Hanks-catalogue](https://github.com/joao-alegre07/Hanks-catalogue), o
+projeto da P1, com todo o histórico. Login, papéis, log, upload e Stripe vieram de lá e só mudaram
+de assunto; a stack no Portainer e o endereço são os mesmos.
+
+- [O que o sistema faz](#o-que-o-sistema-faz)
+- [Como testar](#como-testar)
+- [Arquitetura](#arquitetura)
+- [Papéis e isolamento](#papéis-e-isolamento)
+- [Banco de dados e migrações](#banco-de-dados-e-migrações)
+- [API](#api)
+- [Rodando local](#rodando-local)
+- [Deploy](#deploy)
+- [Plano de negócio](#plano-de-negócio)
+
+A especificação completa, as regras de negócio (com a linha do código de cada uma) e a
+classificação SaaS/PaaS/IaaS estão em [DOCUMENTACAO.md](DOCUMENTACAO.md).
+
+## O que o sistema faz
+
+- **Landing page aberta** na raiz, com a proposta de valor, os planos e o botão de criar conta.
+- **Propriedade e talhões.** O produtor cadastra o sítio e os talhões (nome, área, cultura).
+- **Produtos** com a carência que está na bula.
+- **Caderno de campo**, o recurso principal: cada aplicação tem talhão, produto, dose por hectare,
+  data, quem aplicou, observação e a **foto ou PDF da receita**, guardada no Garage (S3).
+- **Carência por talhão:** cada talhão mostra "em carência até 30/11/2026 · faltam 33 dias" ou
+  "liberado pra colher", contando a aplicação de carência mais longa.
+- **Equipe por convite:** o produtor gera um link (vale 7 dias, uma vez só) e manda pelo WhatsApp.
+  Quem abre cria a conta já dentro da propriedade, como funcionário ou agrônomo.
+- **Log de auditoria** com os eventos do negócio (quem, o quê, quando), só pra admin.
+- **Plano Pro** pelo Stripe (modo de teste), com checkout e webhook.
+
+## Como testar
+
+O roteiro abaixo é o do enunciado, no endereço de produção.
+
+1. Abrir [joao-alegre-isw055.lapps.studio](https://joao-alegre-isw055.lapps.studio/) sem login:
+   aparece a landing page.
+2. **Criar conta grátis** → "Sou produtor". Depois de entrar, o sistema pede a propriedade e em
+   seguida o primeiro talhão.
+3. Em **Produtos**, cadastrar um defensivo com a carência (ex.: 30 dias).
+4. **Registrar aplicação** com uma foto da receita; abrir a aplicação, **Editar** e **Apagar**. O
+   talhão muda de "sem aplicação" pra "em carência até ...".
+5. Numa janela anônima, criar a segunda conta, agora "Sou agrônomo". Ela não faz parte da
+   propriedade da primeira, então:
+   - trocar o id na URL pra um talhão ou aplicação da primeira conta (`/talhoes/<id>`,
+     `/aplicacoes/<id>`, `/api/aplicacoes/<id>`) dá **404**;
+   - tentar registrar uma aplicação direto na API dá **403**, porque agrônomo só acompanha. No
+     console do navegador:
+
+     ```js
+     fetch("/api/aplicacoes", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"})
+       .then(r => console.log(r.status))
+     ```
+6. Com a primeira conta, em **Equipe → Convidar funcionário**, o link abre uma tela de cadastro já
+   dentro da propriedade. O funcionário registra aplicações, mas `DELETE /api/talhoes/<id>` dá 403.
+7. Como admin, **Log → Só eventos do negócio** mostra `talhao_criado`, `aplicacao_registrada`,
+   `aplicacao_editada`, `aplicacao_apagada` e os outros, com o nome de quem fez e o horário.
+
+## Arquitetura
+
+```mermaid
+flowchart TB
+    nav["Navegador ou celular"]
+    cf["Cloudflare + proxy do lapps.studio<br/>HTTPS"]
+
+    subgraph stack["stack hanks-catalogue no Portainer (a mesma de sempre)"]
+        app["app<br/>Flask + Gunicorn<br/>landing, telas, API /api<br/>porta 8212 → 5000"]
+        auth["auth-service<br/>contas e papéis<br/>auth:5001"]
+        log["log-service<br/>eventos<br/>log:5002"]
+        redis[("Redis<br/>stream auditoria")]
+        garage[("Garage · S3<br/>receitas")]
+    end
+
+    db[("MariaDB da disciplina")]
+    stripe["Stripe"]
+    smtp["Brevo · SMTP"]
+
+    nav -->|"HTTPS"| cf
+    cf --> app
+    app -->|"HTTP: cadastro, login, papel atual, nomes"| auth
+    app -->|"HTTP: eventos do negócio, acesso_negado"| log
+    auth -->|"HTTP: login, login_falhou"| log
+    log -->|"XADD / XREVRANGE"| redis
+    app -->|"S3: envia, apaga, URL assinada"| garage
+    app -->|"SQL: propriedades, membros, talhões,<br/>produtos, aplicações"| db
+    auth -->|"SQL: usuarios, reset_tokens"| db
+    auth -->|"e-mail de senha"| smtp
+    app -->|"cria o checkout"| stripe
+    stripe -->|"webhook assinado"| cf
+```
+
+| Serviço | O que faz | Porta | Fala com |
+|---|---|---|---|
+| **app** (`app/`) | Único ponto de entrada: landing, telas, API do caderno, convites, plano e o log pro admin. | `8212` no host → `5000` | auth, log, Garage, MariaDB, Stripe |
+| **auth-service** | Cadastro com papel, login, papel e plano atuais, nomes em lote, recuperação de senha. Único que escreve em `usuarios`. | `5001`, só na rede do Docker | MariaDB, log, SMTP |
+| **log-service** | Recebe os eventos e devolve os últimos N. Único que fala com o Redis. | `5002`, só na rede do Docker | Redis |
+| **Redis** | Stream `auditoria`, com `appendonly` e volume próprio. | só na rede do Docker | — |
+| **Garage** | Object storage compatível com S3 (no lugar do MinIO): as receitas das aplicações, em bucket privado. | só na rede do Docker | — |
+| **MariaDB** | Banco da disciplina, fora da stack. | — | — |
+
+Só o app tem porta publicada. A receita chega no navegador por uma URL assinada que vale 10
+minutos, passando pela rota `/arquivos` do app, que só repassa o pedido pro Garage.
+
+## Papéis e isolamento
+
+O sistema é multi-tenant: todas as propriedades estão no mesmo banco e nos mesmos containers, e
+cada uma é um "cliente". A tabela `membros` diz quem faz parte de qual propriedade, e **toda
+consulta passa por ela**: o que é de outra propriedade não aparece em lista nenhuma e, aberto pelo
+id, responde **404**, igual a um id que não existe.
+
+O papel fica no auth-service e é perguntado a cada requisição (Padrão A), nunca lido da sessão:
+
+| | produtor | funcionário | agrônomo | admin |
+|---|---|---|---|---|
+| Como entra | cadastro aberto | só por convite | cadastro aberto ou convite | direto no banco |
+| Ver talhões, produtos e caderno | ✅ da propriedade dele | ✅ da propriedade em que entrou | ✅ das que acompanha | — |
+| Cadastrar, editar e apagar talhões e produtos | ✅ | 403 | 403 | 403 |
+| Registrar aplicação | ✅ | ✅ | 403 | 403 |
+| Editar e apagar aplicação | ✅ qualquer uma | ✅ só as que registrou | 403 | 403 |
+| Convidar pra equipe, assinar o Pro | ✅ | 403 | 403 | 403 |
+| Ver o log | 403 | 403 | 403 | ✅ |
+
+O papel é conferido antes de olhar o registro, então a ação proibida dá 403 mesmo com um id que
+existe. Todo 403, da tela ou da API, vira um evento `acesso_negado` no log com o método e o caminho.
+
+## Banco de dados e migrações
+
+```mermaid
+erDiagram
+    usuarios ||--o{ propriedades : "é dono"
+    usuarios ||--o{ membros : "participa"
+    propriedades ||--o{ membros : "tem"
+    propriedades ||--o{ convites : "gera"
+    propriedades ||--o{ talhoes : "tem"
+    propriedades ||--o{ produtos : "usa"
+    talhoes ||--o{ aplicacoes : "recebe"
+    produtos ||--o{ aplicacoes : "aplicado em"
+    usuarios ||--o{ aplicacoes : "registra"
+```
+
+Os scripts ficam em [`db/`](db) e rodam em ordem:
+
+| Arquivo | O que faz |
+|---|---|
+| [`000_contas.sql`](db/000_contas.sql) | Tabelas do auth-service (`usuarios`, `reset_tokens`), que já existiam desde o começo. |
+| [`001_dominio.sql`](db/001_dominio.sql) | Domínio: `propriedades`, `membros`, `convites`, `talhoes`, `produtos` e `aplicacoes`. Troca o papel `usuario` por `produtor` e apaga as tabelas antigas que não servem mais. Pode rodar de novo sem estragar nada. |
+| [`seed.sql`](db/seed.sql) | Dados de exemplo pra rodar local: duas propriedades, cinco contas (uma de cada papel e uma produtora de outra propriedade), talhões, produtos e aplicações. **Não roda em produção**: as contas têm senha conhecida. |
+
+Quem clona o repositório recria o banco com as migrações e o seed (o compose de desenvolvimento faz
+isso sozinho na primeira subida). Em produção, as migrações rodam uma vez contra o banco da
+disciplina:
+
+```bash
+mariadb -h "$DB_HOST" -u "$DB_USER" -p "$DB_NAME" < db/001_dominio.sql
+```
+
+## API
+
+JSON, com a mesma sessão das telas (cookie). Tela e API chamam as mesmas funções de
+[`app/caderno.py`](app/caderno.py), então as regras de papel e de propriedade são as mesmas nos dois
+caminhos. A documentação, com "Try it out", fica em
+[`/apidocs`](https://joao-alegre-isw055.lapps.studio/apidocs).
+
+| Método | Rota | O quê |
+|---|---|---|
+| `GET` `POST` | `/api/aplicacoes` | lista (filtro `?talhao_id=`) / registra, em JSON ou multipart com a `receita` |
+| `GET` `PUT` `DELETE` | `/api/aplicacoes/<id>` | detalha / edita / apaga |
+| `GET` `POST` | `/api/talhoes` | lista com a carência / cadastra |
+| `GET` `PUT` `DELETE` | `/api/talhoes/<id>` | detalha / edita / apaga (409 se tiver aplicação) |
+| `GET` `POST` | `/api/produtos` | lista / cadastra |
+| `PUT` `DELETE` | `/api/produtos/<id>` | edita / apaga (409 se já foi aplicado) |
+
+Sem login a API responde 401; papel sem permissão, 403; registro de outra propriedade, 404.
+
+## Rodando local
+
+```bash
+cp .env.example .env
+```
+
+Preencher o `.env` (o `DB_HOST` pode ficar vazio: o compose de desenvolvimento sobe um MariaDB
+próprio) e subir:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+O app fica em http://localhost:5000, com o seed já carregado. Todas as contas do seed têm a senha
+`talhao123`: `marcos@talhaoemdia.local` (produtor), `diego@talhaoemdia.local` (funcionário),
+`ana@talhaoemdia.local` (agrônoma), `rita@talhaoemdia.local` (produtora de outra propriedade) e
+`admin@talhaoemdia.local`. O Grafana fica em http://localhost:3000.
+
+As receitas guardadas no Garage dá pra listar de dentro do container do app:
+
+```bash
+docker compose -f docker-compose.dev.yml exec app flask --app run arquivos
+```
+
+### Testes
+
+Os testes do app sobem o app e o auth-service juntos, contra um MariaDB de verdade criado pelas
+migrações, e seguem o roteiro do enunciado: duas propriedades, 404 entre elas, 403 por papel,
+convite, carência, upload e o log. Localmente precisam de um MariaDB na porta 3307:
+
+```bash
+docker run -d --name talhao-teste-db -e MARIADB_ROOT_PASSWORD=root -e MARIADB_DATABASE=talhao_teste -e MARIADB_USER=teste -e MARIADB_PASSWORD=teste -p 3307:3306 mariadb:11
+```
+
+```bash
+python -m pytest tests && (cd auth-service && python -m pytest) && (cd log-service && python -m pytest)
+```
+
+No GitHub Actions esse MariaDB é um service do job de testes.
+
+## Deploy
+
+A cada push na `main` o GitHub Actions roda os testes, publica as imagens
+`ghcr.io/joao-alegre07/talhao-em-dia-{app,auth,log,garage}` com a tag `sha-<commit>` e tenta
+atualizar a stack pela API do Portainer. O Cloudflare na frente do Portainer ainda barra os runners
+do GitHub, então o último passo é um clique: `IMAGE_TAG` = `sha-<commit>` na stack e **Pull and
+redeploy**.
+
+A stack é a mesma desde a P1 (`hanks-catalogue`), agora puxando o `docker-compose.yml` deste
+repositório, com as mesmas variáveis de ambiente e o mesmo subdomínio.
+
+## Plano de negócio
+
+Escrito na atividade 9, antes do código.
+
+### A dor
 
 **Quem sofre:** o pequeno produtor de café da região de Garça, Pompeia e Marília, com 10 a 30
 hectares divididos em poucos talhões, que toca o sítio com a família e um ou dois funcionários e é
@@ -37,7 +263,7 @@ atendido por um agrônomo de cooperativa ou de revenda que passa a cada 15 dias.
 **Como resolve hoje:** caderno no galpão (quando alguém lembra de escrever), foto da receita no grupo
 de WhatsApp e a memória do produtor.
 
-## Persona
+### Persona
 
 **Marcos, 52 anos, produtor de café em Garça.** Tem 18 hectares de arábica em 4 talhões, herdados do
 pai. Trabalha com o filho, o Diego (24), e contrata dois diaristas na colheita. Acorda às 5h e passa
@@ -52,7 +278,7 @@ cooperativa passa a cada 15 dias, olha a lavoura e deixa a receita.
   buraco em março. Ele usa o celular pra WhatsApp e previsão do tempo, e não quer "sistema de fazenda
   grande".
 
-## Concorrentes e alternativas
+### Concorrentes e alternativas
 
 | Alternativa | Como é usada | O que faz mal |
 |---|---|---|
@@ -61,13 +287,13 @@ cooperativa passa a cada 15 dias, olha a lavoura e deixa a receita.
 | Grupo de WhatsApp com o agrônomo e o funcionário | Foto da receita, "passei o fungicida no 3" | O histórico se perde no meio das mensagens. Não dá pra filtrar por talhão nem tirar um relatório |
 | Software de gestão agrícola completo (Aegro e similares) | Fazenda com gerente e escritório: financeiro, máquinas, colheita, estoque | O pequeno produtor paga e aprende um sistema inteiro pra usar só o caderno de campo |
 
-## Proposta de valor
+### Proposta de valor
 
 Pro pequeno produtor que precisa manter o caderno de campo, o Talhão em Dia é o que o funcionário
 consegue preencher no celular em meio minuto, logo depois de aplicar, e que avisa sozinho quando cada
 talhão está liberado pra colher, sem precisar contratar e aprender um sistema de fazenda grande.
 
-## Modelo de receita (Stripe)
+### Modelo de receita (Stripe)
 
 A cobrança é por **propriedade**, não por usuário: quem assina é o produtor, e o funcionário e o
 agrônomo entram de graça na propriedade dele.
@@ -98,7 +324,7 @@ apagado e o histórico continua legível, mas só os 2 primeiros talhões aceita
 O café tem safra, e o risco é o produtor cancelar na entressafra. Depois de validar o mensal, a ideia
 é um plano anual com desconto.
 
-## Métricas de sucesso
+### Métricas de sucesso
 
 | Métrica | Como medir | Meta pro primeiro ano |
 |---|---|---|
@@ -113,7 +339,7 @@ O café tem safra, e o risco é o produtor cancelar na entressafra. Depois de va
 A última é a que mostra se o caderno saiu do papel: se o registro continua sendo feito dias depois,
 de memória, o produto não resolveu a dor, mesmo com gente pagando.
 
-## Lean Canvas
+### Lean Canvas
 
 | Bloco | Talhão em Dia |
 |---|---|
@@ -127,42 +353,31 @@ de memória, o produto não resolveu a dor, mesmo com gente pagando.
 | **Métricas-chave** | Propriedades ativas, aplicações registradas no mesmo dia, conversão Free → Pro, assinantes, MRR e churn (separando a entressafra). |
 | **Vantagem injusta** | Estudo na Fatec Pompeia, no meio do agro da região, com acesso a produtores e agrônomos que um app de fora não tem. E o histórico de cada talhão: quanto mais safras registradas, mais difícil é trocar de ferramenta. |
 
-## Mapa de reaproveitamento
+### O que veio da P1
 
-Nada da arquitetura do catálogo vai fora. Cada peça ganha um papel no negócio:
+Nada da arquitetura do projeto da P1 foi fora; cada peça ganhou um papel no negócio. Na atividade 10
+esse mapa virou código:
 
-| Peça do projeto atual | O que vira no SaaS | No Talhão em Dia |
+| Peça da P1 | No Talhão em Dia | Situação |
 |---|---|---|
-| Catálogo de filmes (TMDB) | Recurso principal do negócio | Propriedades, talhões (nome, área, cultura) e aplicações (produto, dose, data, carência). O TMDB sai; os produtos entram cadastrados pelo produtor, e dá pra avaliar a API do Agrofit (Embrapa) no lugar |
-| Favoritos com limite no plano grátis | Limite do Free | Até 2 talhões no Free, conferido no backend do mesmo jeito que o limite de 5 favoritos |
-| Comentários com moderação | Conversa sobre o recurso | Observações no talhão: o agrônomo deixa a recomendação, o produtor e o funcionário respondem; o autor apaga o próprio, admin modera |
-| Microsserviço de login + RBAC | Papéis do negócio | `produtor` (dono da propriedade, assina o plano), `funcionario` (registra aplicação), `agronomo` (acompanha várias propriedades) e `admin` (plataforma). Continua no Padrão A: papel e plano atuais conferidos no auth-service |
-| Recuperação de senha por e-mail (Brevo) | E-mail transacional | Continua, e ganha o aviso de carência terminando e de estoque baixo (Pro) |
-| Logs e auditoria (Redis) | Eventos de negócio | `aplicacao_registrada`, `aplicacao_editada`, `talhao_criado`, `estoque_baixo`, `relatorio_gerado`, `plano_pro_ativado`. No caderno de campo o log vale mais ainda: mostra quem mudou um registro e quando |
-| Upload e perfil (Garage) | Arquivos do domínio | Foto do receituário agronômico, da nota fiscal do defensivo e do talhão. Bucket privado e URL pré-assinada continuam fazendo sentido: são documentos da propriedade |
-| Plano Premium (Stripe) | Assinatura | Plano Pro de R$ 29,90/mês por propriedade, mesmo checkout e mesmo webhook. O plano sai do usuário e vai pra propriedade |
-| Swagger (extra) | API documentada | API de propriedades, talhões e aplicações em `/apidocs` |
-| CI/CD (extra) | Deploy a cada push | Testes, imagens no GHCR e deploy com um clique, com as imagens renomeadas pra `talhao-em-dia-*` |
-| Observabilidade (extra) | Saúde do sistema | `/health` e `/metrics` continuam; o painel do Grafana ganha aplicações registradas por dia |
-| Documentação e SaaS/PaaS/IaaS (atividade 8) | Documentação do produto | `DOCUMENTACAO.md` reescrita pro domínio novo; a tabela de camadas continua a mesma, porque a infraestrutura não muda |
+| Catálogo com dados de uma API externa | Propriedades, talhões, produtos e aplicações em tabelas próprias. A API externa saiu; os produtos são cadastrados pelo produtor | feito |
+| Favoritos com limite no plano grátis | Até 2 talhões no Free, conferido no backend | atividade 11 |
+| Comentários com moderação | Observações do agrônomo no talhão | depois |
+| Login + RBAC | `produtor`, `funcionario`, `agronomo` e `admin`, com convite por link. Continua no Padrão A | feito |
+| Recuperação de senha por e-mail (Brevo) | Continua; o aviso de carência terminando entra no Pro | continua |
+| Logs e auditoria (Redis) | Eventos do negócio, com o antes e o depois de cada edição | feito |
+| Upload e perfil (Garage) | Foto ou PDF da receita, ligada à aplicação. O perfil com foto saiu | feito |
+| Plano pago (Stripe) | Pro de R$ 29,90/mês por propriedade. Checkout e webhook continuam; o plano passa pra propriedade | atividade 11 |
+| Swagger (extra) | `/apidocs` com a API do caderno | feito |
+| CI/CD (extra) | Imagens `talhao-em-dia-*`, testes com MariaDB no Actions | feito |
+| Observabilidade (extra) | `/health`, `/metrics` e o painel do Grafana | continua |
+| Documentação (atividade 8) | [DOCUMENTACAO.md](DOCUMENTACAO.md) reescrita pro domínio novo | feito |
 
 ## Backlog
 
-As próximas entregas estão nas [issues do repositório](https://github.com/joao-alegre07/talhao-em-dia/issues),
-marcadas com `atividade 10` (o negócio no ar) e `atividade 11` (a assinatura com Stripe).
-
-## Estado do código
-
-Até a atividade 10 o código aqui é o do catálogo de filmes, e é ele que está no ar em
-[joao-alegre-isw055.lapps.studio](https://joao-alegre-isw055.lapps.studio/): a stack do Portainer
-ainda puxa do Hanks-catalogue. A descrição técnica dele (arquitetura, como rodar, CI/CD,
-observabilidade) está no [README do repositório antigo](https://github.com/joao-alegre07/Hanks-catalogue#readme)
-e em [DOCUMENTACAO.md](DOCUMENTACAO.md).
-
-O GitHub Actions está desligado neste repositório até a troca da stack. O workflow publica as imagens
-em `ghcr.io/joao-alegre07/hanks-catalogue-*`, que estão ligadas ao repositório antigo; se ele rodasse
-aqui, os dois repositórios disputariam as mesmas imagens. Na atividade 10 as imagens ganham o nome do
-produto e o pipeline volta a rodar a partir daqui.
+O que falta está nas [issues do repositório](https://github.com/joao-alegre07/talhao-em-dia/issues):
+`atividade 11` (o Pro por propriedade no Stripe, o limite do Free e o relatório em PDF) e `depois`
+(estoque de defensivos).
 
 ---
 

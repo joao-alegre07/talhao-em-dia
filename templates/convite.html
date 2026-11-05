@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block titulo %}Convite · Talhão em Dia{% endblock %}
+{% block classe %}pagina-estreita{% endblock %}
+{% block conteudo %}
+{% if not session.usuario_id %}<a class="marca marca-solta" href="{{ url_for('inicio.landing') }}">🌱 Talhão em Dia</a>{% endif %}
+
+{% if convite is none %}
+<div class="form caixa">
+  <h1>Convite inválido</h1>
+  <p>Esse link não existe, já foi usado ou passou dos 7 dias. Peça um novo pro produtor.</p>
+</div>
+
+{% elif usuario %}
+<div class="form caixa">
+  <h1>{{ convite.propriedade }}</h1>
+  {% if convite.papel == "agronomo" and usuario.papel == "agronomo" %}
+  <p>O produtor da {{ convite.propriedade }} ({{ convite.municipio }}) convidou você pra acompanhar a propriedade como agrônomo.</p>
+  <form method="post"><button type="submit">Acompanhar a propriedade</button></form>
+  {% else %}
+  <p>Esse convite é pra {{ nomes_dos_papeis[convite.papel] | lower }} e você entrou como {{ nomes_dos_papeis[usuario.papel] | lower }}.
+    {% if convite.papel == "funcionario" %}Saia da sua conta pra criar a conta de funcionário.{% endif %}</p>
+  <p><a href="{{ url_for('auth.logout') }}">Sair</a></p>
+  {% endif %}
+</div>
+
+{% else %}
+<form class="form caixa" method="post">
+  <h1>{{ convite.propriedade }}</h1>
+  <p>Você foi convidado pra entrar na propriedade <strong>{{ convite.propriedade }}</strong> ({{ convite.municipio }}) como <strong>{{ nomes_dos_papeis[convite.papel] | lower }}</strong>.</p>
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  <label>Nome<input type="text" name="nome" required maxlength="100" value="{{ dados.nome or '' }}" autofocus></label>
+  <label>E-mail<input type="email" name="email" required maxlength="150" value="{{ dados.email or '' }}"></label>
+  <label>Senha<input type="password" name="senha" required minlength="6"></label>
+  <button type="submit">Criar conta e entrar na propriedade</button>
+  {% if convite.papel == "agronomo" %}
+  <p>Já tem conta de agrônomo? <a href="{{ url_for('auth.login', proximo=request.path) }}">Entre</a> e o convite abre de novo.</p>
+  {% endif %}
+</form>
+{% endif %}
+{% endblock %}

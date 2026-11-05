@@ -1,7 +1,7 @@
 apiVersion: 1
 
 providers:
-  - name: hanks
+  - name: talhao-em-dia
     folder: ""
     type: file
     options:

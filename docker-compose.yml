@@ -16,12 +16,11 @@
 # cada um); Redis e Garage, que são imagens de terceiros, têm o healthcheck aqui.
 services:
   app:
-    image: ghcr.io/joao-alegre07/hanks-catalogue-app:${IMAGE_TAG:-latest}
+    image: ghcr.io/joao-alegre07/talhao-em-dia-app:${IMAGE_TAG:-latest}
     ports:
       - "8212:5000"
     environment:
       SECRET_KEY: ${SECRET_KEY}
-      TMDB_API_KEY: ${TMDB_API_KEY}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_USER: ${DB_USER}
@@ -48,9 +47,9 @@ services:
 
   # Serviço de autenticação: login, cadastro, papéis (role) e esqueci-senha.
   # Sem "ports:" de propósito -- só acessível pela rede do projeto, nunca
-  # publicado pro host. O catálogo é o único ponto de entrada público.
+  # publicado pro host. O app é o único ponto de entrada público.
   auth:
-    image: ghcr.io/joao-alegre07/hanks-catalogue-auth:${IMAGE_TAG:-latest}
+    image: ghcr.io/joao-alegre07/talhao-em-dia-auth:${IMAGE_TAG:-latest}
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -67,11 +66,11 @@ services:
       - log
     restart: unless-stopped
 
-  # Serviço de auditoria: recebe os eventos do catálogo e do auth e grava
+  # Serviço de auditoria: recebe os eventos do app e do auth e grava
   # num Redis Stream. Também sem porta publicada -- a consulta dos logs
-  # passa pelo catálogo, na rota /admin/logs, que só admin acessa.
+  # passa pelo app, na rota /admin/logs, que só admin acessa.
   log:
-    image: ghcr.io/joao-alegre07/hanks-catalogue-log:${IMAGE_TAG:-latest}
+    image: ghcr.io/joao-alegre07/talhao-em-dia-log:${IMAGE_TAG:-latest}
     environment:
       REDIS_URL: redis://redis:6379/0
     depends_on:
@@ -93,13 +92,13 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # Object storage das fotos de perfil (Garage, compatível com S3, no lugar
-  # do MinIO). Também sem porta publicada: o catálogo envia as fotos e as
-  # URLs assinadas chegam no navegador passando pela rota /fotos do catálogo.
+  # Object storage das receitas das aplicações (Garage, compatível com S3, no
+  # lugar do MinIO). Também sem porta publicada: o app envia os arquivos e as
+  # URLs assinadas chegam no navegador passando pela rota /arquivos do app.
   # O --default-bucket cria o bucket e a chave de acesso no primeiro boot a
   # partir das variáveis GARAGE_DEFAULT_*.
   garage:
-    image: ghcr.io/joao-alegre07/hanks-catalogue-garage:${IMAGE_TAG:-latest}
+    image: ghcr.io/joao-alegre07/talhao-em-dia-garage:${IMAGE_TAG:-latest}
     environment:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
       GARAGE_DEFAULT_BUCKET: ${S3_BUCKET}

@@ -17,7 +17,7 @@ def registrar(acao, usuario_id=None, detalhes=""):
         usuario_id = session.get("usuario_id")
 
     # Se o log-service estiver fora do ar, a ação do usuário não pode falhar
-    # por causa disso -- o evento se perde, mas o catálogo continua funcionando.
+    # por causa disso -- o evento se perde, mas o app continua funcionando.
     try:
         requests.post(
             os.environ["LOG_SERVICE_URL"].rstrip("/") + "/eventos",
@@ -25,7 +25,7 @@ def registrar(acao, usuario_id=None, detalhes=""):
                 "usuario_id": usuario_id,
                 "acao": acao,
                 "ip": ip_origem(),
-                "servico": "catalogo",
+                "servico": "app",
                 "detalhes": detalhes,
             },
             timeout=2,
